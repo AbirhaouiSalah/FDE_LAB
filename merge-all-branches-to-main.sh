@@ -1,4 +1,3 @@
-cat > merge-all-branches-to-main.sh <<'SCRIPT_EOF'
 #!/usr/bin/env bash
 # merge-all-branches-to-main.sh
 # Merge every ats-lab/* branch into main as merge commits. Never deletes branches.
@@ -293,4 +292,3 @@ if [[ "$FAILED" -gt 0 ]]; then
   exit 1
 fi
 exit 0
-SCRIPT_EOF
