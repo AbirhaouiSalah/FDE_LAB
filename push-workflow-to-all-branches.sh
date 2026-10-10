@@ -1,104 +1,194 @@
 #!/usr/bin/env bash
 # push-workflow-to-all-branches.sh
-# Adds .github/workflows/dashboard-ci.yml to every ats-lab/* branch on the remote.
-# Works on bash 3.2+ (macOS default).
+# Push a single file (default: the CI workflow) to every remote branch under a prefix.
+#
+# Usage:
+#   ./push-workflow-to-all-branches.sh
+#   ./push-workflow-to-all-branches.sh --dry-run
+#   ./push-workflow-to-all-branches.sh --file other/path
+#   ./push-workflow-to-all-branches.sh --file-source main
+#   ./push-workflow-to-all-branches.sh --prefix ats-lab
+#   ./push-workflow-to-all-branches.sh --no-prefix
+#   ./push-workflow-to-all-branches.sh --force-push
+#
+# Works on macOS bash 3.2 (no mapfile, no readarray, no associative arrays).
+# Uses pure git plumbing — no worktrees, no checkouts, no external tools.
 
 set -euo pipefail
 
 # ─────────────────────────────────────────────────────────────
-# Config
+# Defaults
 # ─────────────────────────────────────────────────────────────
+GIT_USER_NAME="${GIT_USER_NAME:-AbirhaouiSalah}"
+GIT_USER_EMAIL="${GIT_USER_EMAIL:-sabirhaouipro@gmail.com}"
+
 REMOTE_NAME="origin"
-REMOTE_PREFIX="ats-lab"
-WORKFLOW_PATH=".github/workflows/dashboard-ci.yml"
-SOURCE_REF="HEAD"
-COMMIT_MSG="ci: add dashboard workflow to this branch"
+REMOTE_URL="git@github.com:AbirhaouiSalah/FDE_LAB.git"
+PREFIX="ats-lab"
+FILE_PATH=".github/workflows/dashboard-ci.yml"
+FILE_SOURCE="main"
+COMMIT_MSG_PREFIX="ci: sync"
+
 DRY_RUN=0
 FORCE_PUSH=0
+SKIP_MAIN=0
 
+# ─────────────────────────────────────────────────────────────
+# Args
+# ─────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dry-run)     DRY_RUN=1; shift ;;
-    --force-push)  FORCE_PUSH=1; shift ;;
-    --source)      SOURCE_REF="${2:-}"; shift 2 ;;
-    --prefix)      REMOTE_PREFIX="${2:-}"; shift 2 ;;
-    --remote)      REMOTE_NAME="${2:-}"; shift 2 ;;
-    -h|--help)     sed -n '2,5p' "$0"; exit 0 ;;
-    *) printf 'unexpected arg: %s\n' "$1" >&2; exit 1 ;;
+    --file)         FILE_PATH="${2:-}"; shift 2 ;;
+    --file-source)  FILE_SOURCE="${2:-}"; shift 2 ;;
+    --prefix)       PREFIX="${2:-}"; shift 2 ;;
+    --no-prefix)    PREFIX=""; shift ;;
+    --url)          REMOTE_URL="${2:-}"; shift 2 ;;
+    --remote)       REMOTE_NAME="${2:-}"; shift 2 ;;
+    --skip-main)    SKIP_MAIN=1; shift ;;
+    --force-push)   FORCE_PUSH=1; shift ;;
+    --dry-run)      DRY_RUN=1; shift ;;
+    -h|--help)
+      sed -n '2,15p' "$0"
+      exit 0
+      ;;
+    *)
+      printf 'unexpected arg: %s\n' "$1" >&2
+      exit 1
+      ;;
   esac
 done
 
 # ─────────────────────────────────────────────────────────────
-# Logging
+# Colors + logging
 # ─────────────────────────────────────────────────────────────
 C_RESET="\033[0m"; C_BLUE="\033[1;34m"; C_GREEN="\033[1;32m"
 C_YELLOW="\033[1;33m"; C_RED="\033[1;31m"; C_DIM="\033[2m"
+
 log()  { printf "${C_BLUE}[wf]${C_RESET} %s\n" "$*"; }
 ok()   { printf "${C_GREEN}[ok ]${C_RESET} %s\n" "$*"; }
 warn() { printf "${C_YELLOW}[wrn]${C_RESET} %s\n" "$*"; }
+dry()  { printf "${C_DIM}[dry]${C_RESET} %s\n" "$*"; }
 die()  { printf "${C_RED}[err]${C_RESET} %s\n" "$*" >&2; exit 1; }
 
 # ─────────────────────────────────────────────────────────────
 # Pre-flight
 # ─────────────────────────────────────────────────────────────
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not a git repo"
-[[ -z "$(git status --porcelain)" ]] || die "working tree is dirty — commit or stash first"
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git repo"
 
-git rev-parse --verify "$SOURCE_REF" >/dev/null 2>&1 || die "source ref '$SOURCE_REF' not found"
-git cat-file -e "$SOURCE_REF:$WORKFLOW_PATH" 2>/dev/null \
-  || die "$WORKFLOW_PATH not found in $SOURCE_REF"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+log "repo: $REPO_ROOT"
 
-log "workflow source: $SOURCE_REF:$WORKFLOW_PATH"
-log "target remote:   $REMOTE_NAME"
-log "target prefix:   $REMOTE_PREFIX/"
+if [[ -n "$(git status --porcelain)" ]]; then
+  warn "working tree has uncommitted changes:"
+  git status --short | sed 's/^/    /'
+  die "commit or stash first"
+fi
 
-log "fetching remote refs"
-git fetch --quiet "$REMOTE_NAME" '+refs/heads/*:refs/remotes/'"$REMOTE_NAME"'/*'
+# Configure identity
+git config user.name  "$GIT_USER_NAME"
+git config user.email "$GIT_USER_EMAIL"
+log "identity: $GIT_USER_NAME <$GIT_USER_EMAIL>"
 
-# List every remote ref matching the prefix (bash 3.2-compatible)
+# Configure remote
+if git remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
+  log "updating remote '$REMOTE_NAME' → $REMOTE_URL"
+  git remote set-url "$REMOTE_NAME" "$REMOTE_URL"
+else
+  log "adding remote '$REMOTE_NAME' → $REMOTE_URL"
+  git remote add "$REMOTE_NAME" "$REMOTE_URL"
+fi
+
+log "checking target reachability"
+set +e
+LS_OUT="$(git ls-remote --exit-code "$REMOTE_NAME" 2>&1)"
+LS_RC=$?
+set -e
+if [[ $LS_RC -ne 0 ]]; then
+  warn "git ls-remote failed (rc=$LS_RC):"
+  printf '%s\n' "$LS_OUT" | sed 's/^/    /'
+  die "target not reachable at $REMOTE_URL"
+fi
+ok "target reachable"
+
+# Verify the file exists on the source branch
+log "checking file '$FILE_PATH' on '$FILE_SOURCE'"
+git rev-parse --verify "$FILE_SOURCE" >/dev/null 2>&1 \
+  || die "source branch '$FILE_SOURCE' not found"
+git cat-file -e "$FILE_SOURCE:$FILE_PATH" 2>/dev/null \
+  || die "'$FILE_PATH' not found in branch '$FILE_SOURCE'"
+ok "file exists on $FILE_SOURCE"
+
+# ─────────────────────────────────────────────────────────────
+# Fetch remote refs
+# ─────────────────────────────────────────────────────────────
+log "fetching remote refs from '$REMOTE_NAME'"
+git fetch --quiet --prune "$REMOTE_NAME" 2>/dev/null || true
+
+# ─────────────────────────────────────────────────────────────
+# List target branches (bash 3.2 compatible)
+# ─────────────────────────────────────────────────────────────
 BRANCHES=()
-while IFS= read -r line; do
-  [[ -n "$line" ]] && BRANCHES+=("$line")
-done < <(
-  git for-each-ref --format='%(refname:short)' \
-    "refs/remotes/$REMOTE_NAME/$REMOTE_PREFIX" \
-  | sed "s|^$REMOTE_NAME/||" \
-  | sort
-)
+if [[ -n "$PREFIX" ]]; then
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && BRANCHES+=("$line")
+  done < <(
+    git for-each-ref --format='%(refname:short)' \
+      "refs/remotes/$REMOTE_NAME/$PREFIX" \
+    | sed "s|^$REMOTE_NAME/||" \
+    | sort
+  )
+else
+  while IFS= read -r line; do
+    [[ -n "$line" && "$line" != */HEAD ]] && BRANCHES+=("$line")
+  done < <(
+    git for-each-ref --format='%(refname:short)' \
+      "refs/remotes/$REMOTE_NAME" \
+    | sed "s|^$REMOTE_NAME/||" \
+    | sort
+  )
+fi
 
-[[ ${#BRANCHES[@]} -gt 0 ]] || die "no branches matching '$REMOTE_PREFIX/*' on $REMOTE_NAME"
-log "found ${#BRANCHES[@]} branches to update"
-
-# ─────────────────────────────────────────────────────────────
-# Temp worktree
-# ─────────────────────────────────────────────────────────────
-TMP="$(mktemp -d)"
-cleanup() {
-  git worktree remove --force "$TMP/wt" 2>/dev/null || true
-  rm -rf "$TMP"
-}
-trap cleanup EXIT
-
-git worktree add --detach --quiet "$TMP/wt" "$SOURCE_REF"
-WT="$TMP/wt"
-log "worktree at $WT"
+[[ ${#BRANCHES[@]} -gt 0 ]] || die "no branches matching prefix '$PREFIX/*' on $REMOTE_NAME"
+log "found ${#BRANCHES[@]} target branches"
 
 # ─────────────────────────────────────────────────────────────
-# Iterate
+# Capture file content and blob ONCE
+# ─────────────────────────────────────────────────────────────
+FILE_CONTENT="$(git show "$FILE_SOURCE:$FILE_PATH")"
+FILE_BLOB="$(printf '%s' "$FILE_CONTENT" | git hash-object -w --stdin)"
+FILE_BASENAME="$(basename "$FILE_PATH")"
+FILE_COMMIT_MSG="$COMMIT_MSG_PREFIX $FILE_BASENAME"
+
+log "file blob: ${FILE_BLOB:0:10}…"
+log "file size: $(printf '%s' "$FILE_CONTENT" | wc -c | tr -d ' ') bytes"
+
+# ─────────────────────────────────────────────────────────────
+# Push to each branch
 # ─────────────────────────────────────────────────────────────
 UPDATED=0
 SKIPPED=0
 FAILED=0
 DRY=0
+SKIPPED_MAIN=0
 
-for remote_ref in "${BRANCHES[@]}"; do
-  printf "${C_BLUE}[wf]${C_RESET} %-45s " "$remote_ref"
+PUSH_FLAGS=()
+[[ "$FORCE_PUSH" == "1" ]] && PUSH_FLAGS+=("--force-with-lease")
 
-  # Check if the workflow already exists on that branch
-  if git cat-file -e "$REMOTE_NAME/$remote_ref:$WORKFLOW_PATH" 2>/dev/null; then
-    local_sha="$(git rev-parse "$SOURCE_REF:$WORKFLOW_PATH")"
-    remote_sha="$(git rev-parse "$REMOTE_NAME/$remote_ref:$WORKFLOW_PATH")"
-    if [[ "$local_sha" == "$remote_sha" ]]; then
+for ref in "${BRANCHES[@]}"; do
+  # Handle main specially
+  if [[ "$SKIP_MAIN" == "1" && "$ref" == "$PREFIX/main" ]]; then
+    printf "${C_BLUE}[wf]${C_RESET} %-45s ${C_DIM}(skip — main)${C_RESET}\n" "$ref"
+    SKIPPED_MAIN=$((SKIPPED_MAIN + 1))
+    continue
+  fi
+
+  printf "${C_BLUE}[wf]${C_RESET} %-45s " "$ref"
+
+  # Skip if the remote already has the identical content
+  if git cat-file -e "$REMOTE_NAME/$ref:$FILE_PATH" 2>/dev/null; then
+    existing="$(git show "$REMOTE_NAME/$ref:$FILE_PATH" 2>/dev/null || true)"
+    if [[ "$existing" == "$FILE_CONTENT" ]]; then
       printf "${C_YELLOW}(skip — already up to date)${C_RESET}\n"
       SKIPPED=$((SKIPPED + 1))
       continue
@@ -111,42 +201,55 @@ for remote_ref in "${BRANCHES[@]}"; do
     continue
   fi
 
-  # Check out the branch head in the worktree
-  if ! git -C "$WT" checkout --quiet --detach "$REMOTE_NAME/$remote_ref" 2>/dev/null; then
-    printf "${C_RED}FAILED (checkout)${C_RESET}\n"
+  # Build a commit on top of the remote branch using a temp index
+  TMPINDEX="$(mktemp)"
+  export GIT_INDEX_FILE="$TMPINDEX"
+
+  if ! PARENT="$(git rev-parse "$REMOTE_NAME/$ref" 2>/dev/null)"; then
+    printf "${C_RED}FAILED (no parent ref)${C_RESET}\n"
+    unset GIT_INDEX_FILE; rm -f "$TMPINDEX"
     FAILED=$((FAILED + 1))
     continue
   fi
 
-  # Extract the workflow file from the source ref using git show
-  mkdir -p "$WT/$(dirname "$WORKFLOW_PATH")"
-  if ! git show "$SOURCE_REF:$WORKFLOW_PATH" > "$WT/$WORKFLOW_PATH" 2>/dev/null; then
-    printf "${C_RED}FAILED (extract)${C_RESET}\n"
+  if ! git read-tree "$PARENT" 2>/dev/null; then
+    printf "${C_RED}FAILED (read-tree)${C_RESET}\n"
+    unset GIT_INDEX_FILE; rm -f "$TMPINDEX"
     FAILED=$((FAILED + 1))
     continue
   fi
 
-  # Stage it (git add -A picks up new files anywhere)
-  git -C "$WT" add -A "$(dirname "$WORKFLOW_PATH")"
-
-  # Nothing to commit?
-  if git -C "$WT" diff --quiet --cached; then
-    printf "${C_YELLOW}(skip — no changes)${C_RESET}\n"
-    SKIPPED=$((SKIPPED + 1))
+  if ! git update-index --add --cacheinfo 100644 "$FILE_BLOB" "$FILE_PATH" 2>/dev/null; then
+    printf "${C_RED}FAILED (update-index)${C_RESET}\n"
+    unset GIT_INDEX_FILE; rm -f "$TMPINDEX"
+    FAILED=$((FAILED + 1))
     continue
   fi
 
-  # Commit
-  git -C "$WT" -c user.name="AbirhaouiSalah" \
-              -c user.email="sabirhaouipro@gmail.com" \
-              commit --quiet -m "$COMMIT_MSG"
+  if ! TREE="$(git write-tree 2>/dev/null)"; then
+    printf "${C_RED}FAILED (write-tree)${C_RESET}\n"
+    unset GIT_INDEX_FILE; rm -f "$TMPINDEX"
+    FAILED=$((FAILED + 1))
+    continue
+  fi
 
-  # Push
-  PUSH_FLAGS=()
-  [[ "$FORCE_PUSH" == "1" ]] && PUSH_FLAGS+=("--force-with-lease")
+  unset GIT_INDEX_FILE
+  rm -f "$TMPINDEX"
 
-  if git -C "$WT" push --quiet "${PUSH_FLAGS[@]}" "$REMOTE_NAME" \
-       "HEAD:refs/heads/$remote_ref"; then
+  if ! COMMIT="$(
+      GIT_AUTHOR_NAME="$GIT_USER_NAME" \
+      GIT_AUTHOR_EMAIL="$GIT_USER_EMAIL" \
+      GIT_COMMITTER_NAME="$GIT_USER_NAME" \
+      GIT_COMMITTER_EMAIL="$GIT_USER_EMAIL" \
+      git commit-tree "$TREE" -p "$PARENT" -m "$FILE_COMMIT_MSG" 2>/dev/null
+    )"; then
+    printf "${C_RED}FAILED (commit-tree)${C_RESET}\n"
+    FAILED=$((FAILED + 1))
+    continue
+  fi
+
+  if git push --quiet "${PUSH_FLAGS[@]}" "$REMOTE_NAME" \
+       "$COMMIT:refs/heads/$ref" 2>/dev/null; then
     printf "${C_GREEN}ok${C_RESET}\n"
     UPDATED=$((UPDATED + 1))
   else
@@ -159,11 +262,16 @@ done
 # Summary
 # ─────────────────────────────────────────────────────────────
 echo
-ok "workflow propagation complete"
-printf "  updated: %d\n" "$UPDATED"
-printf "  skipped: %d\n" "$SKIPPED"
-printf "  failed:  %d\n" "$FAILED"
-[[ "$DRY" -gt 0 ]] && printf "  dry:     %d\n" "$DRY"
+ok "propagation complete"
+printf "  updated:      %d\n" "$UPDATED"
+printf "  skipped:      %d\n" "$SKIPPED"
+[[ "$SKIPPED_MAIN" -gt 0 ]] && printf "  skipped main: %d\n" "$SKIPPED_MAIN"
+printf "  failed:       %d\n" "$FAILED"
+[[ "$DRY" -gt 0 ]] && printf "  dry:          %d\n" "$DRY"
+
+URL_BASE="${REMOTE_URL%.git}"
+URL_BASE="${URL_BASE/git@github.com:/https://github.com/}"
+printf "  view:         %s/branches/all\n" "$URL_BASE"
 
 [[ "$FAILED" -gt 0 ]] && exit 1
 exit 0
