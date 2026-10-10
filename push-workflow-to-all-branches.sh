@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # push-workflow-to-all-branches.sh
 # Adds .github/workflows/dashboard-ci.yml to every ats-lab/* branch on the remote.
-# Works on bash 3.2+ (macOS default) — no mapfile/readarray.
+# Works on bash 3.2+ (macOS default).
 
 set -euo pipefail
 
@@ -23,7 +23,7 @@ while [[ $# -gt 0 ]]; do
     --source)      SOURCE_REF="${2:-}"; shift 2 ;;
     --prefix)      REMOTE_PREFIX="${2:-}"; shift 2 ;;
     --remote)      REMOTE_NAME="${2:-}"; shift 2 ;;
-    -h|--help)     sed -n '2,6p' "$0"; exit 0 ;;
+    -h|--help)     sed -n '2,5p' "$0"; exit 0 ;;
     *) printf 'unexpected arg: %s\n' "$1" >&2; exit 1 ;;
   esac
 done
@@ -36,7 +36,6 @@ C_YELLOW="\033[1;33m"; C_RED="\033[1;31m"; C_DIM="\033[2m"
 log()  { printf "${C_BLUE}[wf]${C_RESET} %s\n" "$*"; }
 ok()   { printf "${C_GREEN}[ok ]${C_RESET} %s\n" "$*"; }
 warn() { printf "${C_YELLOW}[wrn]${C_RESET} %s\n" "$*"; }
-dry()  { printf "${C_DIM}[dry]${C_RESET} %s\n" "$*"; }
 die()  { printf "${C_RED}[err]${C_RESET} %s\n" "$*" >&2; exit 1; }
 
 # ─────────────────────────────────────────────────────────────
@@ -53,7 +52,6 @@ log "workflow source: $SOURCE_REF:$WORKFLOW_PATH"
 log "target remote:   $REMOTE_NAME"
 log "target prefix:   $REMOTE_PREFIX/"
 
-# Fetch current remote state
 log "fetching remote refs"
 git fetch --quiet "$REMOTE_NAME" '+refs/heads/*:refs/remotes/'"$REMOTE_NAME"'/*'
 
@@ -72,7 +70,7 @@ done < <(
 log "found ${#BRANCHES[@]} branches to update"
 
 # ─────────────────────────────────────────────────────────────
-# Temporary worktree
+# Temp worktree
 # ─────────────────────────────────────────────────────────────
 TMP="$(mktemp -d)"
 cleanup() {
@@ -120,26 +118,25 @@ for remote_ref in "${BRANCHES[@]}"; do
     continue
   fi
 
-  # Copy the workflow file from the source ref
-  mkdir -p "$WT/.github/workflows"
-  if ! git -C "$WT" checkout --quiet "$SOURCE_REF" -- "$WORKFLOW_PATH" 2>/dev/null; then
+  # Extract the workflow file from the source ref using git show
+  mkdir -p "$WT/$(dirname "$WORKFLOW_PATH")"
+  if ! git show "$SOURCE_REF:$WORKFLOW_PATH" > "$WT/$WORKFLOW_PATH" 2>/dev/null; then
     printf "${C_RED}FAILED (extract)${C_RESET}\n"
     FAILED=$((FAILED + 1))
     continue
   fi
 
+  # Stage it (git add -A picks up new files anywhere)
+  git -C "$WT" add -A "$(dirname "$WORKFLOW_PATH")"
+
   # Nothing to commit?
-  if git -C "$WT" diff --quiet --cached && git -C "$WT" diff --quiet; then
+  if git -C "$WT" diff --quiet --cached; then
     printf "${C_YELLOW}(skip — no changes)${C_RESET}\n"
     SKIPPED=$((SKIPPED + 1))
     continue
   fi
 
   # Commit
-  git -C "$WT" -c user.name="AbirhaouiSalah" \
-              -c user.email="sabirhaouipro@gmail.com" \
-              add "$WORKFLOW_PATH"
-
   git -C "$WT" -c user.name="AbirhaouiSalah" \
               -c user.email="sabirhaouipro@gmail.com" \
               commit --quiet -m "$COMMIT_MSG"
