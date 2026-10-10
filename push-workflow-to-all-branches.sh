@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # push-workflow-to-all-branches.sh
-# Adds .github/workflows/dashboard-ci.yml to every ats-lab/* branch on the remote
-# and pushes the result. Uses a temporary worktree; never touches your working copy.
+# Adds .github/workflows/dashboard-ci.yml to every ats-lab/* branch on the remote.
+# Works on bash 3.2+ (macOS default) — no mapfile/readarray.
 
 set -euo pipefail
 
@@ -11,7 +11,7 @@ set -euo pipefail
 REMOTE_NAME="origin"
 REMOTE_PREFIX="ats-lab"
 WORKFLOW_PATH=".github/workflows/dashboard-ci.yml"
-SOURCE_REF="HEAD"          # where to read the workflow from (current branch by default)
+SOURCE_REF="HEAD"
 COMMIT_MSG="ci: add dashboard workflow to this branch"
 DRY_RUN=0
 FORCE_PUSH=0
@@ -57,8 +57,11 @@ log "target prefix:   $REMOTE_PREFIX/"
 log "fetching remote refs"
 git fetch --quiet "$REMOTE_NAME" '+refs/heads/*:refs/remotes/'"$REMOTE_NAME"'/*'
 
-# List every remote ref matching the prefix
-mapfile -t BRANCHES < <(
+# List every remote ref matching the prefix (bash 3.2-compatible)
+BRANCHES=()
+while IFS= read -r line; do
+  [[ -n "$line" ]] && BRANCHES+=("$line")
+done < <(
   git for-each-ref --format='%(refname:short)' \
     "refs/remotes/$REMOTE_NAME/$REMOTE_PREFIX" \
   | sed "s|^$REMOTE_NAME/||" \
@@ -69,7 +72,7 @@ mapfile -t BRANCHES < <(
 log "found ${#BRANCHES[@]} branches to update"
 
 # ─────────────────────────────────────────────────────────────
-# Set up a temporary worktree
+# Temporary worktree
 # ─────────────────────────────────────────────────────────────
 TMP="$(mktemp -d)"
 cleanup() {
@@ -91,14 +94,10 @@ FAILED=0
 DRY=0
 
 for remote_ref in "${BRANCHES[@]}"; do
-  # remote_ref = ats-lab/comp/widgets/kpi-card
-  short="${remote_ref#"$REMOTE_PREFIX"/}"
-
   printf "${C_BLUE}[wf]${C_RESET} %-45s " "$remote_ref"
 
   # Check if the workflow already exists on that branch
   if git cat-file -e "$REMOTE_NAME/$remote_ref:$WORKFLOW_PATH" 2>/dev/null; then
-    # Already there — compare content
     local_sha="$(git rev-parse "$SOURCE_REF:$WORKFLOW_PATH")"
     remote_sha="$(git rev-parse "$REMOTE_NAME/$remote_ref:$WORKFLOW_PATH")"
     if [[ "$local_sha" == "$remote_sha" ]]; then
@@ -123,11 +122,11 @@ for remote_ref in "${BRANCHES[@]}"; do
 
   # Copy the workflow file from the source ref
   mkdir -p "$WT/.github/workflows"
-  git -C "$WT" checkout --quiet "$SOURCE_REF" -- "$WORKFLOW_PATH" 2>/dev/null || {
+  if ! git -C "$WT" checkout --quiet "$SOURCE_REF" -- "$WORKFLOW_PATH" 2>/dev/null; then
     printf "${C_RED}FAILED (extract)${C_RESET}\n"
     FAILED=$((FAILED + 1))
     continue
-  }
+  fi
 
   # Nothing to commit?
   if git -C "$WT" diff --quiet --cached && git -C "$WT" diff --quiet; then
@@ -140,6 +139,7 @@ for remote_ref in "${BRANCHES[@]}"; do
   git -C "$WT" -c user.name="AbirhaouiSalah" \
               -c user.email="sabirhaouipro@gmail.com" \
               add "$WORKFLOW_PATH"
+
   git -C "$WT" -c user.name="AbirhaouiSalah" \
               -c user.email="sabirhaouipro@gmail.com" \
               commit --quiet -m "$COMMIT_MSG"
