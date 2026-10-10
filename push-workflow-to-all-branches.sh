@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # push-workflow-to-all-branches.sh
-# Push a single file (default: the CI workflow) to every remote branch under a prefix.
+# Push a single file (default: CI workflow) to every remote branch under a prefix.
 #
 # Usage:
 #   ./push-workflow-to-all-branches.sh
 #   ./push-workflow-to-all-branches.sh --dry-run
-#   ./push-workflow-to-all-branches.sh --file other/path
+#   ./push-workflow-to-all-branches.sh --file other/path.yml
 #   ./push-workflow-to-all-branches.sh --file-source main
 #   ./push-workflow-to-all-branches.sh --prefix ats-lab
 #   ./push-workflow-to-all-branches.sh --no-prefix
+#   ./push-workflow-to-all-branches.sh --skip-main
 #   ./push-workflow-to-all-branches.sh --force-push
 #
-# Works on macOS bash 3.2 (no mapfile, no readarray, no associative arrays).
-# Uses pure git plumbing — no worktrees, no checkouts, no external tools.
+# Portable: bash 3.2 (macOS), bash 4+, no mapfile, no worktrees, no external tools.
 
 set -euo pipefail
 
@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
     --force-push)   FORCE_PUSH=1; shift ;;
     --dry-run)      DRY_RUN=1; shift ;;
     -h|--help)
-      sed -n '2,15p' "$0"
+      sed -n '2,17p' "$0"
       exit 0
       ;;
     *)
@@ -126,7 +126,7 @@ log "fetching remote refs from '$REMOTE_NAME'"
 git fetch --quiet --prune "$REMOTE_NAME" 2>/dev/null || true
 
 # ─────────────────────────────────────────────────────────────
-# List target branches (bash 3.2 compatible)
+# List target branches (bash 3.2-safe: no mapfile)
 # ─────────────────────────────────────────────────────────────
 BRANCHES=()
 if [[ -n "$PREFIX" ]]; then
@@ -153,18 +153,26 @@ fi
 log "found ${#BRANCHES[@]} target branches"
 
 # ─────────────────────────────────────────────────────────────
-# Capture file content and blob ONCE
+# Capture file content + blob ONCE
 # ─────────────────────────────────────────────────────────────
 FILE_CONTENT="$(git show "$FILE_SOURCE:$FILE_PATH")"
 FILE_BLOB="$(printf '%s' "$FILE_CONTENT" | git hash-object -w --stdin)"
 FILE_BASENAME="$(basename "$FILE_PATH")"
 FILE_COMMIT_MSG="$COMMIT_MSG_PREFIX $FILE_BASENAME"
 
-log "file blob: ${FILE_BLOB:0:10}…"
+log "file blob: ${FILE_BLOB:0:10}..."
 log "file size: $(printf '%s' "$FILE_CONTENT" | wc -c | tr -d ' ') bytes"
 
 # ─────────────────────────────────────────────────────────────
-# Push to each branch
+# Prepare push flags (portable empty-array pattern)
+# ─────────────────────────────────────────────────────────────
+PUSH_FLAGS=()
+if [[ "$FORCE_PUSH" == "1" ]]; then
+  PUSH_FLAGS+=("--force-with-lease")
+fi
+
+# ─────────────────────────────────────────────────────────────
+# Iterate branches
 # ─────────────────────────────────────────────────────────────
 UPDATED=0
 SKIPPED=0
@@ -172,41 +180,38 @@ FAILED=0
 DRY=0
 SKIPPED_MAIN=0
 
-PUSH_FLAGS=()
-[[ "$FORCE_PUSH" == "1" ]] && PUSH_FLAGS+=("--force-with-lease")
-
 for ref in "${BRANCHES[@]}"; do
-  # Handle main specially
+  # Optional main skip
   if [[ "$SKIP_MAIN" == "1" && "$ref" == "$PREFIX/main" ]]; then
-    printf "${C_BLUE}[wf]${C_RESET} %-45s ${C_DIM}(skip — main)${C_RESET}\n" "$ref"
+    printf "${C_BLUE}[wf]${C_RESET} %-45s ${C_DIM}(skip - main)${C_RESET}\n" "$ref"
     SKIPPED_MAIN=$((SKIPPED_MAIN + 1))
     continue
   fi
 
   printf "${C_BLUE}[wf]${C_RESET} %-45s " "$ref"
 
-  # Skip if the remote already has the identical content
+  # Skip if already identical
   if git cat-file -e "$REMOTE_NAME/$ref:$FILE_PATH" 2>/dev/null; then
     existing="$(git show "$REMOTE_NAME/$ref:$FILE_PATH" 2>/dev/null || true)"
     if [[ "$existing" == "$FILE_CONTENT" ]]; then
-      printf "${C_YELLOW}(skip — already up to date)${C_RESET}\n"
+      printf "${C_YELLOW}(skip - up to date)${C_RESET}\n"
       SKIPPED=$((SKIPPED + 1))
       continue
     fi
   fi
 
   if [[ "$DRY_RUN" == "1" ]]; then
-    printf "${C_DIM}(dry — would add/update)${C_RESET}\n"
+    printf "${C_DIM}(dry - would update)${C_RESET}\n"
     DRY=$((DRY + 1))
     continue
   fi
 
-  # Build a commit on top of the remote branch using a temp index
+  # Build commit with a temp index
   TMPINDEX="$(mktemp)"
   export GIT_INDEX_FILE="$TMPINDEX"
 
   if ! PARENT="$(git rev-parse "$REMOTE_NAME/$ref" 2>/dev/null)"; then
-    printf "${C_RED}FAILED (no parent ref)${C_RESET}\n"
+    printf "${C_RED}FAILED (no parent)${C_RESET}\n"
     unset GIT_INDEX_FILE; rm -f "$TMPINDEX"
     FAILED=$((FAILED + 1))
     continue
@@ -248,7 +253,7 @@ for ref in "${BRANCHES[@]}"; do
     continue
   fi
 
-  if git push --quiet "${PUSH_FLAGS[@]}" "$REMOTE_NAME" \
+  if git push --quiet ${PUSH_FLAGS[@]+"${PUSH_FLAGS[@]}"} "$REMOTE_NAME" \
        "$COMMIT:refs/heads/$ref" 2>/dev/null; then
     printf "${C_GREEN}ok${C_RESET}\n"
     UPDATED=$((UPDATED + 1))
@@ -265,13 +270,20 @@ echo
 ok "propagation complete"
 printf "  updated:      %d\n" "$UPDATED"
 printf "  skipped:      %d\n" "$SKIPPED"
-[[ "$SKIPPED_MAIN" -gt 0 ]] && printf "  skipped main: %d\n" "$SKIPPED_MAIN"
+if [[ "$SKIPPED_MAIN" -gt 0 ]]; then
+  printf "  skipped main: %d\n" "$SKIPPED_MAIN"
+fi
 printf "  failed:       %d\n" "$FAILED"
-[[ "$DRY" -gt 0 ]] && printf "  dry:          %d\n" "$DRY"
+if [[ "$DRY" -gt 0 ]]; then
+  printf "  dry:          %d\n" "$DRY"
+fi
 
+# Browser-friendly view URL
 URL_BASE="${REMOTE_URL%.git}"
 URL_BASE="${URL_BASE/git@github.com:/https://github.com/}"
 printf "  view:         %s/branches/all\n" "$URL_BASE"
 
-[[ "$FAILED" -gt 0 ]] && exit 1
+if [[ "$FAILED" -gt 0 ]]; then
+  exit 1
+fi
 exit 0
