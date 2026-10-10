@@ -1,4 +1,3 @@
-cat > merge-all-branches-to-main.sh <<'SCRIPT_EOF'
 #!/usr/bin/env bash
 # merge-all-branches-to-main.sh
 # Merge every ats-lab/* branch into main as merge commits.
@@ -279,4 +278,3 @@ printf "  view:          %s/commits/%s\n" "$URL_BASE" "$INTO_BRANCH"
 
 [[ "$FAILED" -gt 0 ]] && exit 1
 exit 0
-SCRIPT_EOF
