@@ -1,43 +1,75 @@
 #!/usr/bin/env bash
 # push-all-branches.sh
-# Push every local branch to the target remote, attributed to AbirhaouiSalah.
+# Push every local branch to a remote, optionally under a prefix.
+# Attributed to a fixed git identity so GitHub counts contributions.
 #
 # Usage:
 #   ./push-all-branches.sh
-#   ./push-all-branches.sh --url git@github.com:AbirhaouiSalah/FDE_LAB.git --prefix ats-lab
+#   ./push-all-branches.sh --url git@github.com:USER/REPO.git
+#   ./push-all-branches.sh --prefix ats-lab
+#   ./push-all-branches.sh --no-prefix
+#   ./push-all-branches.sh --force-push
 #   ./push-all-branches.sh --dry-run
+#
+# Safety:
+#   - refuses to push with a dirty working tree
+#   - verifies the remote is reachable before pushing anything
+#   - never uses plain -f (only --force-with-lease, and only with --force-push)
+#   - idempotent: branches already on the remote are skipped
 
 set -euo pipefail
 
 # ─────────────────────────────────────────────────────────────
-# Configuration — defaults
+# Defaults
 # ─────────────────────────────────────────────────────────────
 GIT_USER_NAME="AbirhaouiSalah"
 GIT_USER_EMAIL="sabirhaouipro@gmail.com"
-REMOTE_URL="git@github.com:AbirhaouiSalah/FDE_LAB.git"
-REMOTE_NAME="origin"
-PREFIX="ats-lab"
-DRY_RUN=0
 
+REMOTE_NAME="origin"
+REMOTE_URL="git@github.com:AbirhaouiSalah/FDE_LAB.git"
+PREFIX="ats-lab"
+FORCE_PUSH=0
+DRY_RUN=0
+SKIP_MAIN=0
+
+# ─────────────────────────────────────────────────────────────
+# Args
+# ─────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --url)         REMOTE_URL="${2:-}"; shift 2 ;;
     --remote-name) REMOTE_NAME="${2:-}"; shift 2 ;;
     --prefix)      PREFIX="${2:-}"; shift 2 ;;
     --no-prefix)   PREFIX=""; shift ;;
+    --skip-main)   SKIP_MAIN=1; shift ;;
+    --force-push)  FORCE_PUSH=1; shift ;;
     --dry-run)     DRY_RUN=1; shift ;;
-    -h|--help)     sed -n '2,8p' "$0"; exit 0 ;;
-    *) printf 'unexpected argument: %s\n' "$1" >&2; exit 1 ;;
+    -h|--help)
+      sed -n '2,16p' "$0"
+      exit 0
+      ;;
+    *)
+      printf 'unexpected argument: %s\n' "$1" >&2
+      exit 1
+      ;;
   esac
 done
 
 # ─────────────────────────────────────────────────────────────
 # Logging
 # ─────────────────────────────────────────────────────────────
-log()  { printf '\033[1;34m[push]\033[0m %s\n' "$*"; }
-ok()   { printf '\033[1;32m[ ok ]\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*"; }
-die()  { printf '\033[1;31m[fail]\033[0m %s\n' "$*" >&2; exit 1; }
+C_RESET="\033[0m"
+C_BLUE="\033[1;34m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_RED="\033[1;31m"
+C_DIM="\033[2m"
+
+log()  { printf "${C_BLUE}[push]${C_RESET} %s\n" "$*"; }
+ok()   { printf "${C_GREEN}[ ok ]${C_RESET} %s\n" "$*"; }
+warn() { printf "${C_YELLOW}[warn]${C_RESET} %s\n" "$*"; }
+dry()  { printf "${C_DIM}[ dry]${C_RESET} %s\n" "$*"; }
+die()  { printf "${C_RED}[fail]${C_RESET} %s\n" "$*" >&2; exit 1; }
 
 # ─────────────────────────────────────────────────────────────
 # Pre-flight
@@ -48,20 +80,25 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 log "repo: $REPO_ROOT"
 
-# Working tree must be clean (or we refuse to push, to avoid surprises)
+# Refuse if the working tree is dirty
 if [[ -n "$(git status --porcelain)" ]]; then
   warn "working tree has uncommitted changes:"
   git status --short | sed 's/^/    /'
   die "commit or stash before pushing"
 fi
 
-# Set local (repo-scoped) identity so every push is attributed correctly
+# ─────────────────────────────────────────────────────────────
+# Configure local git identity (repo-scoped)
+# ─────────────────────────────────────────────────────────────
 log "configuring local git identity"
 git config user.name  "$GIT_USER_NAME"
 git config user.email "$GIT_USER_EMAIL"
-git config --list | grep -E '^user\.' | sed 's/^/    /'
+printf '    user.name=%s\n'  "$(git config user.name)"
+printf '    user.email=%s\n' "$(git config user.email)"
 
+# ─────────────────────────────────────────────────────────────
 # Configure remote
+# ─────────────────────────────────────────────────────────────
 if git remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
   log "updating remote '$REMOTE_NAME' → $REMOTE_URL"
   git remote set-url "$REMOTE_NAME" "$REMOTE_URL"
@@ -72,7 +109,7 @@ fi
 git remote -v | sed 's/^/    /'
 
 # ─────────────────────────────────────────────────────────────
-# Verify target reachable
+# Verify remote is reachable
 # ─────────────────────────────────────────────────────────────
 log "checking target reachability"
 set +e
@@ -82,17 +119,61 @@ set -e
 if [[ $LS_RC -ne 0 ]]; then
   warn "git ls-remote failed (rc=$LS_RC):"
   printf '%s\n' "$LS_OUT" | sed 's/^/    /'
-  die "target not reachable"
+  die "target not reachable at $REMOTE_URL"
 fi
 ok "target reachable"
 
 # ─────────────────────────────────────────────────────────────
-# Push
+# Helpers
 # ─────────────────────────────────────────────────────────────
-PUSHED=0; SKIPPED=0; FAILED=0
+PUSH_FLAGS=()
+[[ "$FORCE_PUSH" == "1" ]] && PUSH_FLAGS+=("--force-with-lease")
+
+remote_has_branch() {
+  local dest="$1"
+  git ls-remote --exit-code --heads "$REMOTE_NAME" "$dest" >/dev/null 2>&1
+}
+
+push_one() {
+  local branch="$1"
+  local dest="$2"
+
+  printf "${C_BLUE}[push]${C_RESET} %-45s → %-45s " "$branch" "$dest"
+
+  if remote_has_branch "$dest"; then
+    if [[ "$FORCE_PUSH" != "1" ]]; then
+      printf "${C_YELLOW}(skip)${C_RESET}\n"
+      return 2   # skipped
+    fi
+    # force-push intent: fall through
+  fi
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    printf "${C_DIM}(dry)${C_RESET}\n"
+    return 3   # dry
+  fi
+
+  if git push "${PUSH_FLAGS[@]}" --quiet "$REMOTE_NAME" \
+        "refs/heads/$branch:refs/heads/$dest"; then
+    printf "${C_GREEN}ok${C_RESET}\n"
+    return 0   # pushed
+  else
+    printf "${C_RED}FAILED${C_RESET}\n"
+    return 1   # failed
+  fi
+}
+
+# ─────────────────────────────────────────────────────────────
+# Push every local branch
+# ─────────────────────────────────────────────────────────────
+PUSHED=0
+SKIPPED=0
+FAILED=0
+DRY=0
 
 while IFS= read -r branch; do
-  [[ "$branch" == "main" ]] && continue
+  [[ -z "$branch" ]] && continue
+  [[ "$branch" == "main" && "$SKIP_MAIN" == "1" ]] && continue
 
   if [[ -n "$PREFIX" ]]; then
     dest="${PREFIX}/${branch}"
@@ -100,46 +181,18 @@ while IFS= read -r branch; do
     dest="${branch}"
   fi
 
-  printf '\033[1;34m[push]\033[0m %-45s → %s ' "$branch" "$dest"
+  set +e
+  push_one "$branch" "$dest"
+  rc=$?
+  set -e
 
-  # Skip if remote already has this ref
-  if git ls-remote --exit-code --heads "$REMOTE_NAME" "$dest" >/dev/null 2>&1; then
-    printf '\033[1;33m(skip)\033[0m\n'
-    SKIPPED=$((SKIPPED + 1))
-    continue
-  fi
-
-  if [[ "$DRY_RUN" == "1" ]]; then
-    printf '\033[2m(dry)\033[0m\n'
-    continue
-  fi
-
-  if git push --quiet "$REMOTE_NAME" "refs/heads/$branch:refs/heads/$dest"; then
-    printf '\033[1;32mok\033[0m\n'
-    PUSHED=$((PUSHED + 1))
-  else
-    printf '\033[1;31mFAILED\033[0m\n'
-    FAILED=$((FAILED + 1))
-  fi
+  case "$rc" in
+    0) PUSHED=$((PUSHED + 1)) ;;
+    1) FAILED=$((FAILED + 1)) ;;
+    2) SKIPPED=$((SKIPPED + 1)) ;;
+    3) DRY=$((DRY + 1)) ;;
+  esac
 done < <(git for-each-ref --format='%(refname:short)' refs/heads | sort)
-
-# Push main under the prefix too
-MAIN_DEST="${PREFIX:+$PREFIX/}main"
-printf '\033[1;34m[push]\033[0m %-45s → %s ' "main" "$MAIN_DEST"
-if git ls-remote --exit-code --heads "$REMOTE_NAME" "$MAIN_DEST" >/dev/null 2>&1; then
-  printf '\033[1;33m(skip)\033[0m\n'
-  SKIPPED=$((SKIPPED + 1))
-elif [[ "$DRY_RUN" == "1" ]]; then
-  printf '\033[2m(dry)\033[0m\n'
-else
-  if git push --quiet "$REMOTE_NAME" "refs/heads/main:refs/heads/$MAIN_DEST"; then
-    printf '\033[1;32mok\033[0m\n'
-    PUSHED=$((PUSHED + 1))
-  else
-    printf '\033[1;31mFAILED\033[0m\n'
-    FAILED=$((FAILED + 1))
-  fi
-fi
 
 # ─────────────────────────────────────────────────────────────
 # Summary
@@ -149,12 +202,25 @@ ok "push complete"
 printf "  pushed:  %d\n" "$PUSHED"
 printf "  skipped: %d\n" "$SKIPPED"
 printf "  failed:  %d\n" "$FAILED"
+[[ "$DRY" -gt 0 ]] && printf "  dry-run: %d\n" "$DRY"
 
+# Build a browser-friendly URL from a git URL
+browser_url() {
+  local u="$1"
+  u="${u%.git}"
+  case "$u" in
+    git@github.com:*)  printf 'https://github.com/%s\n' "${u#git@github.com:}" ;;
+    https://github.com/*) printf '%s\n' "$u" ;;
+    *) printf '%s\n' "$u" ;;
+  esac
+}
+
+URL_BASE="$(browser_url "$REMOTE_URL")"
 if [[ -n "$PREFIX" ]]; then
-  printf "  view:    %s/branches/all?query=%s\n" \
-    "${REMOTE_URL%.git}" "${PREFIX%%/*}"
+  printf "  view:    %s/branches/all?query=%s\n" "$URL_BASE" "${PREFIX%%/*}"
 else
-  printf "  view:    %s/branches/all\n" "${REMOTE_URL%.git}"
+  printf "  view:    %s/branches/all\n" "$URL_BASE"
 fi
 
 [[ "$FAILED" -gt 0 ]] && exit 1
+exit 0

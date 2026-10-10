@@ -12,20 +12,49 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write        # needed for the auto-commit job
+  contents: write
   pull-requests: write
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   PNPM_VERSION: '9'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   # ────────────────────────────────────────────────────────────
-  # 1. Lint + typecheck — fast fail
+  # 1. Validate branch name — optional ats-lab/ prefix allowed
+  # ────────────────────────────────────────────────────────────
+  validate-branch-name:
+    name: Validate branch name
+    if: >-
+      github.ref != 'refs/heads/main'
+      && github.ref != 'refs/heads/ats-lab/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check branch name
+        run: |
+          set -euo pipefail
+          B="${GITHUB_REF#refs/heads/}"
+          RE='^(ats-lab/)?(comp|feat|fix|chore|docs|spike)/[a-z0-9-]+(/[a-z0-9-]+)?$'
+          if [[ ! "$B" =~ $RE ]]; then
+            echo "::error::Branch '$B' does not match naming convention"
+            echo "Expected: [ats-lab/]<type>/<scope>[/<description>]"
+            echo "Types: comp | feat | fix | chore | docs | spike"
+            exit 1
+          fi
+          echo "Branch name ok: $B"
+
+  # ────────────────────────────────────────────────────────────
+  # 2. Lint + typecheck
   # ────────────────────────────────────────────────────────────
   lint-and-typecheck:
     name: Lint & typecheck
-    runs-on: ubuntu-latest
+    needs: validate-branch-name
+    if: >-
+      always()
+      && (needs.validate-branch-name.result == 'success'
+          || needs.validate-branch-name.result == 'skipped')
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -42,19 +71,23 @@ jobs:
         run: pnpm install --frozen-lockfile=false
 
       - name: Lint
-        run: pnpm lint || true
+        run: pnpm lint --if-present
 
       - name: Typecheck
-        run: pnpm typecheck || true
+        run: pnpm typecheck --if-present
 
   # ────────────────────────────────────────────────────────────
-  # 2. Unit + component tests
+  # 3. Unit & component tests
   # ────────────────────────────────────────────────────────────
   unit-tests:
     name: Unit & component tests
-    needs: lint-and-typecheck
-    runs-on: ubuntu-latest
-    steps
+    needs: [validate-branch-name, lint-and-typecheck]
+    if: >-
+      always()
+      && (needs.lint-and-typecheck.result == 'success'
+          || needs.lint-and-typecheck.result == 'skipped')
+    runs-on: ubuntu-24.04
+    steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
@@ -70,7 +103,7 @@ jobs:
         run: pnpm install --frozen-lockfile=false
 
       - name: Run tests
-        run: pnpm test -- --run --reporter=verbose
+        run: pnpm test --if-present -- --run
         continue-on-error: true
 
       - name: Upload coverage
@@ -82,12 +115,16 @@ jobs:
           if-no-files-found: ignore
 
   # ────────────────────────────────────────────────────────────
-  # 3. Build
+  # 4. Build
   # ────────────────────────────────────────────────────────────
   build:
     name: Build
     needs: unit-tests
-    runs-on: ubuntu-latest
+    if: >-
+      always()
+      && (needs.unit-tests.result == 'success'
+          || needs.unit-tests.result == 'skipped')
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -104,7 +141,7 @@ jobs:
         run: pnpm install --frozen-lockfile=false
 
       - name: Build
-        run: pnpm build || echo "no build script yet"
+        run: pnpm build --if-present
 
       - name: Upload dist
         if: always()
@@ -115,13 +152,13 @@ jobs:
           if-no-files-found: ignore
 
   # ────────────────────────────────────────────────────────────
-  # 4. Generate a CI report and commit it back to the branch
+  # 5. CI report — committed back to the branch with [skip ci]
   # ────────────────────────────────────────────────────────────
   ci-report-and-commit:
     name: Report & auto-commit
-    needs: [lint-and-typecheck, unit-tests, build]
+    needs: [validate-branch-name, lint-and-typecheck, unit-tests, build]
     if: always() && github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -131,49 +168,50 @@ jobs:
       - name: Configure git
         run: |
           git config user.name  "AbirhaouiSalah"
-          git config user.email "abirhaoui.salah@users.noreply.github.com"
+          git config user.email "sabirhaouipro@gmail.com"
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false
-
-      - name: Ensure report folder exists
+      - name: Prepare report folder
         run: mkdir -p .ci-reports
 
       - name: Write CI status report
+        env:
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RES_VALIDATE: ${{ needs.validate-branch-name.result }}
+          RES_LINT: ${{ needs.lint-and-typecheck.result }}
+          RES_TESTS: ${{ needs.unit-tests.result }}
+          RES_BUILD: ${{ needs.build.result }}
         run: |
-          cat > .ci-reports/${{ github.ref_name }}.md <<EOF
-          # CI Report — ${{ github.ref_name }}
+          set -euo pipefail
+          SAFE_BRANCH="${BRANCH//\//_}"
+          TS="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > ".ci-reports/${SAFE_BRANCH}.md" <<EOF
+          # CI Report — ${BRANCH}
 
-          **Commit:** ${{ github.sha }}
-          **Actor:**   ${{ github.actor }}
-          **Time:**    $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          **Run:**     ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - **Commit:** \`${SHA}\`
+          - **Actor:** ${ACTOR}
+          - **Time:** ${TS}
+          - **Run:** ${RUN_URL}
 
           | Job | Result |
           |-----|--------|
-          | lint-and-typecheck | ${{ needs.lint-and-typecheck.result }} |
-          | unit-tests          | ${{ needs.unit-tests.result }} |
-          | build               | ${{ needs.build.result }} |
+          | validate-branch-name | ${RES_VALIDATE} |
+          | lint-and-typecheck   | ${RES_LINT} |
+          | unit-tests           | ${RES_TESTS} |
+          | build                | ${RES_BUILD} |
           EOF
-          # Sanitize branch name for the filename
-          safe_name="$(echo '${{ github.ref_name }}' | tr '/' '_')"
-          mv .ci-reports/${{ github.ref_name }}.md ".ci-reports/${safe_name}.md"
+          echo "----- generated report -----"
+          cat ".ci-reports/${SAFE_BRANCH}.md"
 
       - name: Commit and push report
         run: |
+          set -euo pipefail
           if [[ -n "$(git status --porcelain .ci-reports)" ]]; then
             git add .ci-reports
-            git commit -m "ci: report for ${{ github.ref_name }} @ ${{ github.sha }} [skip ci]"
-            git push origin HEAD:${{ github.ref_name }}
+            git commit -m "ci: report for ${GITHUB_REF_NAME} @ ${GITHUB_SHA} [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           else
             echo "No report changes to commit"
           fi
@@ -181,10 +219,13 @@ jobs:
       - name: Job summary
         if: always()
         run: |
-          echo "## Dashboard CI" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| lint-and-typecheck | ${{ needs.lint-and-typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| unit-tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Dashboard CI"
+            echo ""
+            echo "| Job | Result |"
+            echo "|-----|--------|"
+            echo "| validate-branch-name | ${{ needs.validate-branch-name.result }} |"
+            echo "| lint-and-typecheck   | ${{ needs.lint-and-typecheck.result }} |"
+            echo "| unit-tests           | ${{ needs.unit-tests.result }} |"
+            echo "| build                | ${{ needs.build.result }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
