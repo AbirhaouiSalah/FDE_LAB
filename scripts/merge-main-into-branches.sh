@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# scripts/merge-main-into-branches.sh
+# scripts/merge-main-into-branches.sh (v2)
 #
 # Merge 'main' dans chaque branche ats-lab/* pour que les branches
 # contiennent tout le contenu de main + leur historique propre.
 #
-# Approche: git worktree + merge --no-ff --allow-unrelated-histories -X theirs
+# Résolution automatique des conflits en faveur de main (--theirs).
 #
 # Usage:
 #   ./scripts/merge-main-into-branches.sh [OPTIONS]
@@ -12,7 +12,7 @@
 # Options:
 #   --dry-run       Simule, ne pousse rien
 #   --yes, -y       Pas de confirmation interactive
-#   --source <b>    Branche source à propager (défaut: main)
+#   --source <b>    Branche source (défaut: main)
 #   -h, --help      Aide
 
 set -euo pipefail
@@ -33,7 +33,7 @@ while [ $# -gt 0 ]; do
     --dry-run)  DRY_RUN=1 ;;
     --yes|-y)   ASSUME_YES=1 ;;
     --source)   shift; SOURCE_BRANCH="${1:?--source requiert une valeur}" ;;
-    -h|--help)  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) printf 'Argument inconnu: %s\n' "$1" >&2; exit 1 ;;
   esac
   shift
@@ -63,7 +63,6 @@ git rev-parse --verify "$SOURCE_BRANCH" >/dev/null 2>&1 \
 log "Fetch origin…"
 git fetch origin --prune 2>/dev/null || die "Fetch échoué"
 
-# ─── Liste des branches ────────────────────────────────────────────────────
 BRANCHES=()
 while IFS= read -r b; do
   [ -n "$b" ] && BRANCHES+=("$b")
@@ -81,13 +80,10 @@ if [ "$DRY_RUN" -eq 0 ]; then
   git push origin "$BACKUP" >/dev/null 2>&1 && ok "Backup: origin/$BACKUP" || warn "Backup échouée"
 fi
 
-# ─── Confirmation ─────────────────────────────────────────────────────────
 if [ "$DRY_RUN" -eq 0 ] && [ "$ASSUME_YES" -eq 0 ]; then
   printf '\n'
-  warn "Cette opération va:"
-  warn "  Merger '$SOURCE_BRANCH' dans $TOTAL branches ats-lab/*"
-  warn "  Résolution: -X theirs (favorise $SOURCE_BRANCH en cas de conflit)"
-  warn "  Push automatique de chaque branche"
+  warn "Merger '$SOURCE_BRANCH' dans $TOTAL branches ats-lab/*"
+  warn "Résolution automatique des conflits en faveur de $SOURCE_BRANCH"
   printf '\nContinuer ? [y/N] '
   read -r ans
   [ "${ans:-N}" = "y" ] || [ "${ans:-N}" = "Y" ] || { echo "Abort."; exit 0; }
@@ -108,7 +104,7 @@ cleanup_worktrees() {
 }
 trap cleanup_worktrees EXIT
 
-# ─── Phase unique: merge main → chaque branche ────────────────────────────
+# ─── Merge main → chaque branche ──────────────────────────────────────────
 M_MERGED=0; M_SKIP=0; M_FAILED=0
 FAILED_LIST=()
 
@@ -122,11 +118,11 @@ for b in "${BRANCHES[@]}"; do
 
   SAFE="${b//\//_}"
   WT="$WORKTREE_BASE/$SAFE"
+  TMP_BRANCH="align-tmp-$$-$SAFE"
 
   echo ""
   log "▶ $b"
 
-  # Créer un worktree détaché sur origin/$b
   if ! git worktree add --detach "$WT" "origin/$b" >/dev/null 2>&1; then
     warn "  worktree add échoué"
     M_FAILED=$((M_FAILED+1)); FAILED_LIST+=("$b (worktree)"); continue
@@ -145,7 +141,6 @@ for b in "${BRANCHES[@]}"; do
     continue
   fi
 
-  # Nombre de commits à absorber
   AHEAD=$(cd "$WT" && git rev-list --count "HEAD..$SOURCE_BRANCH" 2>/dev/null || echo "?")
   log "  $AHEAD commits de $SOURCE_BRANCH à absorber"
 
@@ -155,32 +150,67 @@ for b in "${BRANCHES[@]}"; do
     continue
   fi
 
-  # Merge main dans la branche
-  (
+  # ─── Merge avec résolution automatique des conflits ─────────────────
+  PUSHED_SHA=$(
     cd "$WT" || exit 1
 
-    # Se positionner sur la branche locale
-    BRANCH_LOCAL="align-tmp-$$-$SAFE"
-    git checkout -b "$BRANCH_LOCAL" >/dev/null 2>&1 || exit 1
+    # Créer branche locale
+    git checkout -b "$TMP_BRANCH" >/dev/null 2>&1 || exit 1
 
-    # Merge main avec -X theirs (favorise main en cas de conflit)
-    if ! git -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
+    # 1. Merge avec -X theirs (résout les hunks)
+    MERGE_OK=0
+    if git -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
          merge --no-ff --allow-unrelated-histories -X theirs \
          -m "merge: align $b with $SOURCE_BRANCH [skip ci]" \
          "$SOURCE_BRANCH" >/dev/null 2>&1; then
-      echo "MERGE_CONFLICT" >&2
-      exit 2
+      MERGE_OK=1
+    fi
+
+    # 2. Si conflit → résoudre automatiquement en faveur de main
+    if [ "$MERGE_OK" -eq 0 ]; then
+      CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+
+      if [ -z "$CONFLICTS" ]; then
+        # Pas de conflit listé mais merge a échoué → erreur inconnue
+        echo "MERGE_FAILED_NO_CONFLICT" >&2
+        exit 2
+      fi
+
+      # Résoudre chaque conflit avec la version de "theirs" (= main)
+      echo "$CONFLICTS" | while IFS= read -r f; do
+        [ -z "$f" ] && continue
+        if git checkout --theirs -- "$f" 2>/dev/null; then
+          git add -- "$f"
+        else
+          # Si checkout échoue (fichier binaire ?), on prend main
+          git rm -f -- "$f" 2>/dev/null || true
+          git show "$SOURCE_BRANCH:$f" > "$f" 2>/dev/null && git add -- "$f" || true
+        fi
+      done
+
+      # Vérifier qu'il ne reste plus de conflit
+      REMAINING=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+      if [ -n "$REMAINING" ]; then
+        echo "UNRESOLVED_CONFLICTS: $REMAINING" >&2
+        exit 2
+      fi
+
+      # Finaliser le merge
+      if ! git -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
+           commit --no-edit >/dev/null 2>&1; then
+        echo "FINAL_COMMIT_FAILED" >&2
+        exit 2
+      fi
     fi
 
     LOCAL_SHA="$(git rev-parse HEAD)"
 
-    # Push vers la branche cible
+    # Push
     if ! git push origin "HEAD:refs/heads/$b" >/dev/null 2>&1; then
       echo "PUSH_FAILED" >&2
       exit 3
     fi
 
-    # Vérifier
     REMOTE_SHA="$(git ls-remote origin "refs/heads/$b" 2>/dev/null | awk '{print $1}')"
     if [ "$REMOTE_SHA" != "$LOCAL_SHA" ]; then
       echo "MISMATCH local=$LOCAL_SHA remote=$REMOTE_SHA" >&2
@@ -192,11 +222,11 @@ for b in "${BRANCHES[@]}"; do
   RC=$?
 
   if [ "$RC" -eq 0 ]; then
-    ok "  aligné avec $SOURCE_BRANCH"
+    ok "  aligné avec $SOURCE_BRANCH (sha=$(printf '%.7s' "$PUSHED_SHA"))"
     M_MERGED=$((M_MERGED+1))
   else
     case "$RC" in
-      2) warn "  conflit non résolu → abort" ;;
+      2) warn "  conflit non résolu" ;;
       3) warn "  push échoué" ;;
       4) warn "  remote mismatch" ;;
       *) warn "  échec (code $RC)" ;;
@@ -204,7 +234,7 @@ for b in "${BRANCHES[@]}"; do
     M_FAILED=$((M_FAILED+1)); FAILED_LIST+=("$b (rc=$RC)")
   fi
 
-  git branch -D "align-tmp-$$-$SAFE" >/dev/null 2>&1 || true
+  git branch -D "$TMP_BRANCH" >/dev/null 2>&1 || true
   git worktree remove --force "$WT" 2>/dev/null || rm -rf "$WT"
 done
 
