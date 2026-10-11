@@ -1,0 +1,297 @@
+#!/usr/bin/env bash
+# scripts/cleanup-branches.sh
+#
+# Nettoie l'état du repo après les opérations sync/merge:
+#   - Worktrees résiduels (.sync-worktrees, .align-worktrees)
+#   - Branches locales temporaires (sync-tmp-*, align-tmp-*, test-*, merge-test)
+#   - Branches distantes de travail sur origin
+#   - Backups locales anciennes (option --keep-backups N)
+#   - Fichiers non traqués parasites
+#
+# Usage:
+#   ./scripts/cleanup-branches.sh                    # dry-run (affiche ce qui serait fait)
+#   ./scripts/cleanup-branches.sh --yes              # exécute le nettoyage
+#   ./scripts/cleanup-branches.sh --keep-backups 3   # garde les 3 backups les plus récentes
+#   ./scripts/cleanup-branches.sh --keep-backups 0   # supprime toutes les backups locales
+#   ./scripts/cleanup-branches.sh --remote           # nettoie aussi les branches distantes
+#   ./scripts/cleanup-branches.sh --help
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
+
+# ─── Options ───────────────────────────────────────────────────────────────
+DRY_RUN=1
+KEEP_BACKUPS=5
+CLEAN_REMOTE=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --yes|-y)         DRY_RUN=0 ;;
+    --dry-run)        DRY_RUN=1 ;;
+    --keep-backups)   shift; KEEP_BACKUPS="${1:?--keep-backups requiert un nombre}" ;;
+    --remote)         CLEAN_REMOTE=1 ;;
+    -h|--help)
+      sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *) printf 'Argument inconnu: %s\n' "$1" >&2; exit 1 ;;
+  esac
+  shift
+done
+
+# ─── Couleurs ──────────────────────────────────────────────────────────────
+if [ -t 1 ]; then
+  C_RED=$'\033[0;31m'; C_GRN=$'\033[0;32m'; C_YEL=$'\033[0;33m'
+  C_BLU=$'\033[0;34m'; C_CYA=$'\033[0;36m'; C_DIM=$'\033[2m'; C_RST=$'\033[0m'
+else
+  C_RED=""; C_GRN=""; C_YEL=""; C_BLU=""; C_CYA=""; C_DIM=""; C_RST=""
+fi
+log()  { printf '%s[clean]%s %s\n' "$C_BLU" "$C_RST" "$*"; }
+ok()   { printf '%s[ok   ]%s %s\n' "$C_GRN" "$C_RST" "$*"; }
+warn() { printf '%s[warn ]%s %s\n' "$C_YEL" "$C_RST" "$*" >&2; }
+err()  { printf '%s[err  ]%s %s\n' "$C_RED" "$C_RST" "$*" >&2; }
+info() { printf '%s%s%s\n' "$C_DIM" "$*" "$C_RST"; }
+sep()  { printf '%s%s%s\n' "$C_DIM" "════════════════════════════════════════════════════════════════" "$C_RST"; }
+sub()  { printf '%s%s%s\n' "$C_DIM" "────────────────────────────────────────────────────────────────" "$C_RST"; }
+
+# ─── Préflight ─────────────────────────────────────────────────────────────
+[ -d .git ] || { err "Pas dans un dépôt git"; exit 1; }
+
+MODE_LABEL="[DRY-RUN]"
+[ "$DRY_RUN" -eq 0 ] && MODE_LABEL="[EXECUTE]"
+
+log "Mode: $MODE_LABEL"
+log "Répertoire: $ROOT_DIR"
+log "Garder les $KEEP_BACKUPS backups locales les plus récentes"
+[ "$CLEAN_REMOTE" -eq 1 ] && log "Nettoyage remote: ACTIVÉ" || log "Nettoyage remote: désactivé (--remote pour activer)"
+
+# ─── État du repo ──────────────────────────────────────────────────────────
+sep
+echo "  ÉTAT INITIAL"
+sep
+echo ""
+
+echo "Branche courante: $(git branch --show-current)"
+echo "Working tree:"
+if [ -z "$(git status --porcelain)" ]; then
+  echo "  clean"
+else
+  git status --short | head -n 20
+fi
+echo ""
+
+# ─── 1. Worktrees résiduels ────────────────────────────────────────────────
+sep
+echo "  1. WORKTREES RÉSIDUELS"
+sep
+echo ""
+
+WORKTREE_COUNT=0
+while IFS= read -r line; do
+  [ -z "$line" ] && continue
+  WT_PATH="$(printf '%s' "$line" | awk '{print $1}')"
+  [ "$WT_PATH" = "$ROOT_DIR" ] && continue
+  case "$WT_PATH" in
+    */.sync-worktrees/*|*/.align-worktrees/*|*/tmp/*|*/test-wt|*/merge-test)
+      echo "  → $WT_PATH"
+      WORKTREE_COUNT=$((WORKTREE_COUNT+1))
+      if [ "$DRY_RUN" -eq 0 ]; then
+        git worktree remove --force "$WT_PATH" 2>/dev/null && ok "    retiré" || warn "    échec"
+      fi
+      ;;
+  esac
+done < <(git worktree list --porcelain | grep '^worktree ' | sed 's/^worktree //')
+
+if [ "$WORKTREE_COUNT" -eq 0 ]; then
+  ok "Aucun worktree résiduel"
+else
+  log "$WORKTREE_COUNT worktree(s) à nettoyer"
+fi
+echo ""
+
+# Supprimer les dossiers orphelins
+for d in .sync-worktrees .align-worktrees; do
+  if [ -d "$d" ]; then
+    echo "  → dossier orphelin: $d"
+    if [ "$DRY_RUN" -eq 0 ]; then
+      rm -rf "$d"
+      ok "    supprimé"
+    fi
+  fi
+done
+echo ""
+
+# ─── 2. Branches locales temporaires ───────────────────────────────────────
+sep
+echo "  2. BRANCHES LOCALES TEMPORAIRES"
+sep
+echo ""
+
+TEMP_PATTERNS=(
+  'sync-tmp-*'
+  'align-tmp-*'
+  'test-sync'
+  'merge-test'
+  'test-*'
+)
+
+TEMP_COUNT=0
+for pattern in "${TEMP_PATTERNS[@]}"; do
+  while IFS= read -r b; do
+    [ -z "$b" ] && continue
+    # Skip les branches "officielles"
+    case "$b" in
+      ats-lab/*|main|develop|staging|production) continue ;;
+    esac
+    echo "  → $b"
+    TEMP_COUNT=$((TEMP_COUNT+1))
+    if [ "$DRY_RUN" -eq 0 ]; then
+      git branch -D "$b" 2>/dev/null && ok "    supprimée" || warn "    échec"
+    fi
+  done < <(git branch --list "$pattern" 2>/dev/null | sed 's/^[* ] *//')
+done
+
+if [ "$TEMP_COUNT" -eq 0 ]; then
+  ok "Aucune branche temporaire locale"
+else
+  log "$TEMP_COUNT branche(s) temporaire(s) locale(s)"
+fi
+echo ""
+
+# ─── 3. Backups locales anciennes ──────────────────────────────────────────
+sep
+echo "  3. BACKUPS LOCALES (garder les $KEEP_BACKUPS plus récentes)"
+sep
+echo ""
+
+BACKUPS=()
+while IFS= read -r b; do
+  [ -z "$b" ] && continue
+  BACKUPS+=("$b")
+done < <(git branch --list 'backup/*' 2>/dev/null | sed 's/^[* ] *//' | sort -r)
+
+echo "Backups trouvées (${#BACKUPS[@]}):"
+for b in "${BACKUPS[@]+"${BACKUPS[@]}"}"; do
+  echo "  - $b"
+done
+echo ""
+
+if [ "${#BACKUPS[@]}" -gt "$KEEP_BACKUPS" ]; then
+  TO_DELETE=("${BACKUPS[@]:$KEEP_BACKUPS}")
+  log "${#TO_DELETE[@]} backup(s) à supprimer:"
+  for b in "${TO_DELETE[@]}"; do
+    echo "  → $b"
+    if [ "$DRY_RUN" -eq 0 ]; then
+      git branch -D "$b" 2>/dev/null && ok "    supprimée" || warn "    échec"
+    fi
+  done
+else
+  ok "Toutes les backups sont conservées (≤ $KEEP_BACKUPS)"
+fi
+echo ""
+
+# ─── 4. Branches distantes temporaires ─────────────────────────────────────
+if [ "$CLEAN_REMOTE" -eq 1 ]; then
+  sep
+  echo "  4. BRANCHES DISTANTES TEMPORAIRES"
+  sep
+  echo ""
+
+  log "Fetch origin…"
+  git fetch origin --prune 2>/dev/null || warn "Fetch échoué"
+
+  REMOTE_TEMP=()
+  while IFS= read -r b; do
+    [ -z "$b" ] && continue
+    case "$b" in
+      *sync-tmp-*|*align-tmp-*|*/test-*|*/test-sync|*/merge-test)
+        REMOTE_TEMP+=("$b")
+        ;;
+    esac
+  done < <(git ls-remote --heads origin 2>/dev/null | awk -F'refs/heads/' '{print $2}')
+
+  if [ "${#REMOTE_TEMP[@]}" -eq 0 ]; then
+    ok "Aucune branche distante temporaire"
+  else
+    log "${#REMOTE_TEMP[@]} branche(s) distante(s) à supprimer:"
+    for b in "${REMOTE_TEMP[@]}"; do
+      echo "  → origin/$b"
+      if [ "$DRY_RUN" -eq 0 ]; then
+        git push origin --delete "$b" 2>&1 | tail -1 || warn "    échec"
+      fi
+    done
+  fi
+  echo ""
+else
+  info "  (nettoyage distant désactivé — utilise --remote pour l'activer)"
+  echo ""
+fi
+
+# ─── 5. Fichiers non traqués parasites ─────────────────────────────────────
+sep
+echo "  5. FICHIERS NON TRAQUÉS PARASITES"
+sep
+echo ""
+
+PARASITE_COUNT=0
+while IFS= read -r line; do
+  [ -z "$line" ] && continue
+  case "$line" in
+    '?? '*'TEST_SYNC.txt'*|'?? '*.bak|'?? '*.log|'?? '*.tmp|'?? '*.swp|'?? '*~|'?? '.sync-worktrees/'*|'?? '.align-worktrees/'*)
+      FILE="${line#\?\? }"
+      echo "  → $FILE"
+      PARASITE_COUNT=$((PARASITE_COUNT+1))
+      if [ "$DRY_RUN" -eq 0 ]; then
+        rm -rf "$FILE" && ok "    supprimé"
+      fi
+      ;;
+  esac
+done < <(git status --porcelain 2>/dev/null | grep '^??')
+
+if [ "$PARASITE_COUNT" -eq 0 ]; then
+  ok "Aucun fichier parasite non traqué"
+else
+  log "$PARASITE_COUNT fichier(s) à nettoyer"
+fi
+echo ""
+
+# ─── 6. État final ─────────────────────────────────────────────────────────
+sep
+echo "  ÉTAT FINAL"
+sep
+echo ""
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  info "  (Mode dry-run: rien n'a été modifié)"
+  info "  Lance avec --yes pour exécuter le nettoyage"
+else
+  echo "Branches locales restantes:"
+  git branch --list | sed 's/^/  /'
+  echo ""
+  echo "Worktrees:"
+  git worktree list | sed 's/^/  /'
+  echo ""
+  echo "Working tree:"
+  if [ -z "$(git status --porcelain)" ]; then
+    ok "  clean"
+  else
+    git status --short | head -n 10 | sed 's/^/  /'
+  fi
+fi
+echo ""
+
+# ─── Résumé ────────────────────────────────────────────────────────────────
+sep
+if [ "$DRY_RUN" -eq 1 ]; then
+  warn "DRY-RUN — aucune modification effectuée"
+  info ""
+  info "Pour exécuter: ./scripts/cleanup-branches.sh --yes"
+  info "Pour inclure remote: ./scripts/cleanup-branches.sh --yes --remote"
+  info "Pour garder N backups: ./scripts/cleanup-branches.sh --yes --keep-backups 3"
+else
+  ok "Nettoyage terminé"
+fi
+sep
