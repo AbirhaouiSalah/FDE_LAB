@@ -5,13 +5,17 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   {
-    ignores: [
-      'dist/**',
-      'coverage/**',
-      'node_modules/**',
-      '.ci-reports/**',
-      '**/*.d.ts',
-    ],
+  ignores: [
+    'dist/**',
+    'coverage/**',
+    'node_modules/**',
+    '.ci-reports/**',
+    '.sync-worktrees/**',
+    '.align-worktrees/**',
+    'public/**',
+    'workflows/**',       // ← doublons, à retirer plus tard si besoin
+    '**/*.d.ts',
+  ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
