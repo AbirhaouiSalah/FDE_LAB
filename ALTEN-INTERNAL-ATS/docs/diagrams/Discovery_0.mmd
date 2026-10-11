@@ -1,0 +1,28 @@
+flowchart TD
+    subgraph Discovery ["Phase 1: HR Discovery & Framing"]
+        A["HR stakeholder discovery<br>*(Recruiters & Hiring Managers)*"] --> B["Validated workflow & pain points<br>*(Screening volume & friction)*"]
+        B --> C["Baseline KPI & success criteria<br>*(Target: -50% screening time)*"]
+        C --> D["Approved FDE evaluation rubric<br>*(Experience, Tech, Client-facing)*"]
+    end
+
+    subgraph Architecture ["Phase 2: Core Engineering & Architecture"]
+        D --> E["Structured evaluation schema<br>*(JSON contract & weights)*"]
+        E --> F["Robust CV Parser & Ingestion<br>*(PDF/TXT extraction pipeline)*"]
+        F --> G["Multi-dimensional Scoring Engine<br>*(Hard constraints & soft metrics)*"]
+    end
+
+    subgraph Evaluation ["Phase 3: Copilot Execution & Delivery"]
+        G --> H["Evidence-backed candidate scorecard<br>*(Match %, gaps, interview prompts)*"]
+        H --> I["Human recruiter review & decision<br>*(Copilot validation)*"]
+    end
+
+    subgraph Feedback ["Phase 4: Continuous Improvement & MCO"]
+        I --> J["Measure time saved & match quality<br>*(Production metrics tracking)*"]
+        J --> K["Recruiter feedback loop<br>*(Prompt & weight recalibration)*"]
+        K --> C
+    end
+
+    style Discovery fill:#f9f,stroke:#333,stroke-width:2px
+    style Architecture fill:#bbf,stroke:#333,stroke-width:2px
+    style Evaluation fill:#bfb,stroke:#333,stroke-width:2px
+    style Feedback fill:#ff9,stroke:#333,stroke-width:2px
