@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
-# scripts/cleanup-branches.sh (v2)
+# scripts/cleanup-branches.sh (v3)
 #
 # Nettoie l'état du repo après les opérations sync/merge:
-#   - Worktrees résiduels (.sync-worktrees, .align-worktrees)
-#   - Branches locales temporaires (sync-tmp-*, align-tmp-*, test-*, merge-test)
-#   - Branches distantes de travail sur origin
-#   - Backups locales anciennes (option --keep-backups N)
-#   - Fichiers non traqués parasites
+#   1. Worktrees résiduels (.sync-worktrees, .align-worktrees, .push-worktrees, etc.)
+#   2. Branches locales temporaires (sync-tmp-*, align-tmp-*, push-tmp-*, mod-tmp-*)
+#   3. Branches locales orphelines (sans équivalent remote)
+#   4. Branches locales "nu" (comp/*, feat/* sans préfixe ats-lab/)
+#   5. Backups locales anciennes (garde les N plus récentes)
+#   6. Branches distantes temporaires (option --remote)
+#   7. Fichiers non traqués parasites
 #
 # Usage:
-#   ./scripts/cleanup-branches.sh                    # dry-run (affiche ce qui serait fait)
-#   ./scripts/cleanup-branches.sh --yes              # exécute le nettoyage
+#   ./scripts/cleanup-branches.sh                    # dry-run (défaut)
+#   ./scripts/cleanup-branches.sh --yes              # exécute
 #   ./scripts/cleanup-branches.sh --keep-backups 3   # garde les 3 backups les plus récentes
 #   ./scripts/cleanup-branches.sh --keep-backups 0   # supprime toutes les backups locales
 #   ./scripts/cleanup-branches.sh --remote           # nettoie aussi les branches distantes
+#   ./scripts/cleanup-branches.sh --no-orphans       # ne supprime PAS les branches orphelines
 #   ./scripts/cleanup-branches.sh --help
 
 set -euo pipefail
@@ -22,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
-# Force le head BSD (macOS) pour éviter les conflits avec le head Perl
+# Force head BSD (macOS) au lieu du head Perl
 HEAD_BIN="/usr/bin/head"
 [ -x "$HEAD_BIN" ] || HEAD_BIN="head"
 head_n() { "$HEAD_BIN" -n "$1"; }
@@ -31,6 +34,7 @@ head_n() { "$HEAD_BIN" -n "$1"; }
 DRY_RUN=1
 KEEP_BACKUPS=5
 CLEAN_REMOTE=0
+CLEAN_ORPHANS=1
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -38,8 +42,9 @@ while [ $# -gt 0 ]; do
     --dry-run)        DRY_RUN=1 ;;
     --keep-backups)   shift; KEEP_BACKUPS="${1:?--keep-backups requiert un nombre}" ;;
     --remote)         CLEAN_REMOTE=1 ;;
+    --no-orphans)     CLEAN_ORPHANS=0 ;;
     -h|--help)
-      sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) printf 'Argument inconnu: %s\n' "$1" >&2; exit 1 ;;
@@ -76,8 +81,13 @@ if [ "$CLEAN_REMOTE" -eq 1 ]; then
 else
   log "Nettoyage remote: désactivé (--remote pour activer)"
 fi
+if [ "$CLEAN_ORPHANS" -eq 1 ]; then
+  log "Suppression des branches orphelines: ACTIVÉE"
+else
+  log "Suppression des branches orphelines: désactivée"
+fi
 
-# ─── État du repo ──────────────────────────────────────────────────────────
+# ─── État initial ──────────────────────────────────────────────────────────
 sep
 echo "  ÉTAT INITIAL"
 sep
@@ -92,6 +102,15 @@ else
 fi
 echo ""
 
+# S'assurer qu'on n'est pas sur une branche qu'on va supprimer
+CURRENT_BRANCH="$(git branch --show-current)"
+if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
+  info "Bascule sur main avant nettoyage…"
+  if [ "$DRY_RUN" -eq 0 ]; then
+    git checkout main >/dev/null 2>&1 || git checkout master >/dev/null 2>&1 || true
+  fi
+fi
+
 # ─── 1. Worktrees résiduels ────────────────────────────────────────────────
 sep
 echo "  1. WORKTREES RÉSIDUELS"
@@ -104,7 +123,7 @@ while IFS= read -r line; do
   WT_PATH="$(printf '%s' "$line" | awk '{print $1}')"
   [ "$WT_PATH" = "$ROOT_DIR" ] && continue
   case "$WT_PATH" in
-    */.sync-worktrees/*|*/.align-worktrees/*|*/tmp/*|*/test-wt|*/merge-test)
+    */.sync-worktrees/*|*/.align-worktrees/*|*/.push-worktrees/*|*/.modify-worktrees/*|*/tmp/*|*/test-wt|*/merge-test)
       echo "  → $WT_PATH"
       WORKTREE_COUNT=$((WORKTREE_COUNT+1))
       if [ "$DRY_RUN" -eq 0 ]; then
@@ -121,8 +140,8 @@ else
 fi
 echo ""
 
-# Supprimer les dossiers orphelins
-for d in .sync-worktrees .align-worktrees; do
+# Dossiers orphelins
+for d in .sync-worktrees .align-worktrees .push-worktrees .modify-worktrees; do
   if [ -d "$d" ]; then
     echo "  → dossier orphelin: $d"
     if [ "$DRY_RUN" -eq 0 ]; then
@@ -142,6 +161,8 @@ echo ""
 TEMP_PATTERNS=(
   'sync-tmp-*'
   'align-tmp-*'
+  'push-tmp-*'
+  'mod-tmp-*'
   'test-sync'
   'merge-test'
   'test-*'
@@ -153,7 +174,7 @@ for pattern in "${TEMP_PATTERNS[@]}"; do
     [ -z "$b" ] && continue
     # Skip les branches "officielles"
     case "$b" in
-      ats-lab/*|main|develop|staging|production|backup/*) continue ;;
+      ats-lab/*|main|master|develop|staging|production|backup/*) continue ;;
     esac
     echo "  → $b"
     TEMP_COUNT=$((TEMP_COUNT+1))
@@ -170,9 +191,53 @@ else
 fi
 echo ""
 
-# ─── 3. Backups locales anciennes ──────────────────────────────────────────
+# ─── 3. Branches locales orphelines (sans remote) ──────────────────────────
+if [ "$CLEAN_ORPHANS" -eq 1 ]; then
+  sep
+  echo "  3. BRANCHES LOCALES ORPHELINES (sans équivalent remote)"
+  sep
+  echo ""
+
+  # Récupérer la liste des branches remote
+  REMOTE_BRANCHES=$(git ls-remote --heads origin 2>/dev/null \
+                    | awk -F'refs/heads/' '{print $2}' || true)
+
+  ORPHAN_COUNT=0
+  while IFS= read -r b; do
+    [ -z "$b" ] && continue
+    # Skip les branches protégées
+    case "$b" in
+      main|master|develop|staging|production) continue ;;
+      ats-lab/*) continue ;;
+      backup/*) continue ;;
+    esac
+
+    # Vérifier si la branche existe sur origin
+    if [ -n "$REMOTE_BRANCHES" ] && printf '%s\n' "$REMOTE_BRANCHES" | grep -qx "$b"; then
+      continue
+    fi
+
+    echo "  → $b (locale uniquement)"
+    ORPHAN_COUNT=$((ORPHAN_COUNT+1))
+    if [ "$DRY_RUN" -eq 0 ]; then
+      git branch -D "$b" 2>/dev/null && ok "    supprimée" || warn "    échec"
+    fi
+  done < <(git branch --format='%(refname:short)' 2>/dev/null)
+
+  if [ "$ORPHAN_COUNT" -eq 0 ]; then
+    ok "Aucune branche locale orpheline"
+  else
+    log "$ORPHAN_COUNT branche(s) orpheline(s)"
+  fi
+  echo ""
+else
+  info "  (Section orphelines désactivée — utilise --no-orphans pour la désactiver définitivement)"
+  echo ""
+fi
+
+# ─── 4. Backups locales anciennes ──────────────────────────────────────────
 sep
-echo "  3. BACKUPS LOCALES (garder les $KEEP_BACKUPS plus récentes)"
+echo "  4. BACKUPS LOCALES (garder les $KEEP_BACKUPS plus récentes)"
 sep
 echo ""
 
@@ -189,7 +254,6 @@ done
 echo ""
 
 if [ "${#BACKUPS[@]}" -gt "$KEEP_BACKUPS" ]; then
-  # Compter combien à supprimer
   TO_DELETE=()
   i=0
   for b in "${BACKUPS[@]}"; do
@@ -209,10 +273,10 @@ else
 fi
 echo ""
 
-# ─── 4. Branches distantes temporaires ─────────────────────────────────────
+# ─── 5. Branches distantes temporaires ─────────────────────────────────────
 if [ "$CLEAN_REMOTE" -eq 1 ]; then
   sep
-  echo "  4. BRANCHES DISTANTES TEMPORAIRES"
+  echo "  5. BRANCHES DISTANTES TEMPORAIRES"
   sep
   echo ""
 
@@ -223,7 +287,7 @@ if [ "$CLEAN_REMOTE" -eq 1 ]; then
   while IFS= read -r b; do
     [ -z "$b" ] && continue
     case "$b" in
-      *sync-tmp-*|*align-tmp-*|*/test-*|*/test-sync|*/merge-test)
+      *sync-tmp-*|*align-tmp-*|*push-tmp-*|*mod-tmp-*|*/test-*|*/test-sync|*/merge-test)
         REMOTE_TEMP+=("$b")
         ;;
     esac
@@ -242,13 +306,13 @@ if [ "$CLEAN_REMOTE" -eq 1 ]; then
   fi
   echo ""
 else
-  info "  (nettoyage distant désactivé — utilise --remote pour l'activer)"
+  info "  (Nettoyage distant désactivé — utilise --remote pour l'activer)"
   echo ""
 fi
 
-# ─── 5. Fichiers non traqués parasites ─────────────────────────────────────
+# ─── 6. Fichiers non traqués parasites ─────────────────────────────────────
 sep
-echo "  5. FICHIERS NON TRAQUÉS PARASITES"
+echo "  6. FICHIERS NON TRAQUÉS PARASITES"
 sep
 echo ""
 
@@ -256,7 +320,7 @@ PARASITE_COUNT=0
 while IFS= read -r line; do
   [ -z "$line" ] && continue
   case "$line" in
-    '?? '*'TEST_SYNC.txt'*|'?? '*.bak|'?? '*.log|'?? '*.tmp|'?? '*.swp|'?? '*~|'?? '.sync-worktrees/'*|'?? '.align-worktrees/'*)
+    '?? '*'TEST_SYNC.txt'*|'?? '*.bak|'?? '*.log|'?? '*.tmp|'?? '*.swp|'?? '*~|'?? '.sync-worktrees/'*|'?? '.align-worktrees/'*|'?? '.push-worktrees/'*|'?? '.modify-worktrees/'*)
       FILE="${line#\?\? }"
       echo "  → $FILE"
       PARASITE_COUNT=$((PARASITE_COUNT+1))
@@ -274,7 +338,7 @@ else
 fi
 echo ""
 
-# ─── 6. État final ─────────────────────────────────────────────────────────
+# ─── État final ────────────────────────────────────────────────────────────
 sep
 echo "  ÉTAT FINAL"
 sep
