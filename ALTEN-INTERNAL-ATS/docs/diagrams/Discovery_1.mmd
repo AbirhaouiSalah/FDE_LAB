@@ -1,0 +1,70 @@
+flowchart TD
+    subgraph P1["Phase 1 — Discovery"]
+        A["HR stakeholder discovery<br/><i>recruiters, HM, DPO, ATS admin</i>"]
+        A --> A1["Shadowing + time-and-motion<br/><i>1 week observation</i>"]
+        A1 --> B["Validated workflow<br/>and pain points P1–P8"]
+        B --> C["Baseline KPI and<br/>success criteria<br/><i>K1 = 18 min → 9 min</i>"]
+    end
+
+    subgraph P2["Phase 2 — Rubric Design"]
+        C --> D["Approved FDE evaluation rubric<br/><i>9 dimensions, weighted</i>"]
+        D --> D1{"Rubric sign-off<br/>HR + HM + DPO?"}
+        D1 -- No --> D
+        D1 -- Yes --> D2["Guardrails locked<br/><i>no protected attrs,<br/>no auto-reject</i>"]
+    end
+
+    subgraph P3["Phase 3 — Schema & Parsing"]
+        D2 --> E["Structured evaluation schema<br/><i>score, evidence, confidence</i>"]
+        E --> F["CV parser +<br/>evidence extraction"]
+        F --> F1["Skill taxonomy<br/>normalization<br/><i>React = ReactJS</i>"]
+        F1 --> F2{"Parsing<br/>confidence OK?"}
+        F2 -- Low --> F3["Human triage queue"]
+        F2 -- High --> G
+        F3 --> G
+    end
+
+    subgraph P4["Phase 4 — Scoring Engine"]
+        G["Rule-based scoring +<br/>uncertainty flagging"]
+        G --> G1["LLM scoring with<br/>evidence citations"]
+        G1 --> G2{"Bias & parity<br/>check passed?"}
+        G2 -- Fail --> G3["Block + escalate<br/>to DPO"]
+        G2 -- Pass --> H
+        G3 --> H
+    end
+
+    subgraph P5["Phase 5 — Human-in-the-Loop"]
+        H["Evidence-backed<br/>candidate scorecard"]
+        H --> I["Human recruiter review<br/><i>override allowed</i>"]
+        I --> I1{"Recruiter<br/>decision"}
+        I1 -- Override --> I2["Capture rationale<br/><i>feedback to rubric</i>"]
+        I1 -- Accept --> J
+        I2 --> J
+    end
+
+    subgraph P6["Phase 6 — Measure & Iterate"]
+        J["Measure time saved,<br/>quality, parity"]
+        J --> J1{"K1 −50% AND<br/>κ ≥ 0.75 AND<br/>parity ≤ 5%?"}
+        J1 -- Yes --> K["Pilot success<br/>→ scale to other roles"]
+        J1 -- No --> L["Root cause analysis<br/><i>rubric? prompt? data?</i>"]
+        L --> C
+        I2 -. feedback loop .-> D
+        J -. continuous eval .-> G1
+    end
+
+    classDef discovery fill:#e3f2fd,stroke:#1976d2,color:#000
+    classDef rubric fill:#fff3e0,stroke:#f57c00,color:#000
+    classDef parsing fill:#f3e5f5,stroke:#7b1fa2,color:#000
+    classDef scoring fill:#e8f5e9,stroke:#388e3c,color:#000
+    classDef human fill:#fce4ec,stroke:#c2185b,color:#000
+    classDef measure fill:#e0f7fa,stroke:#00838f,color:#000
+    classDef gate fill:#fffde7,stroke:#f9a825,color:#000,stroke-width:2px
+    classDef stop fill:#ffebee,stroke:#c62828,color:#000,stroke-width:2px
+
+    class A,A1,B,C discovery
+    class D,D2 rubric
+    class E,F,F1 parsing
+    class G,G1 scoring
+    class H,I,I1,I2 human
+    class J,J1,K,L measure
+    class D1,F2,G2 gate
+    class G3 stop
