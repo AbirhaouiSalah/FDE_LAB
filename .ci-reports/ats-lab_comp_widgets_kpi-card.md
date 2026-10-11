@@ -1,9 +1,9 @@
 # CI Report — ats-lab/comp/widgets/kpi-card
 
-- **Commit:** `3354db270cce9b1f59dc5ba15903dfae8e8e164b`
+- **Commit:** `827b6208707847efef5d21e6bc3551b9fe0e86b0`
 - **Actor:** AbirhaouiSalah
-- **Time:** 2026-10-10T22:05:33Z
-- **Run:** https://github.com/AbirhaouiSalah/FDE_LAB/actions/runs/38090071321
+- **Time:** 2026-10-11T17:33:42Z
+- **Run:** https://github.com/AbirhaouiSalah/FDE_LAB/actions/runs/38160122867
 
 | Job | Result |
 |-----|--------|
