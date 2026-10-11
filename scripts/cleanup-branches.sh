@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/cleanup-branches.sh
+# scripts/cleanup-branches.sh (v2)
 #
 # Nettoie l'état du repo après les opérations sync/merge:
 #   - Worktrees résiduels (.sync-worktrees, .align-worktrees)
@@ -21,6 +21,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
+
+# Force le head BSD (macOS) pour éviter les conflits avec le head Perl
+HEAD_BIN="/usr/bin/head"
+[ -x "$HEAD_BIN" ] || HEAD_BIN="head"
+head_n() { "$HEAD_BIN" -n "$1"; }
 
 # ─── Options ───────────────────────────────────────────────────────────────
 DRY_RUN=1
@@ -66,7 +71,11 @@ MODE_LABEL="[DRY-RUN]"
 log "Mode: $MODE_LABEL"
 log "Répertoire: $ROOT_DIR"
 log "Garder les $KEEP_BACKUPS backups locales les plus récentes"
-[ "$CLEAN_REMOTE" -eq 1 ] && log "Nettoyage remote: ACTIVÉ" || log "Nettoyage remote: désactivé (--remote pour activer)"
+if [ "$CLEAN_REMOTE" -eq 1 ]; then
+  log "Nettoyage remote: ACTIVÉ"
+else
+  log "Nettoyage remote: désactivé (--remote pour activer)"
+fi
 
 # ─── État du repo ──────────────────────────────────────────────────────────
 sep
@@ -79,7 +88,7 @@ echo "Working tree:"
 if [ -z "$(git status --porcelain)" ]; then
   echo "  clean"
 else
-  git status --short | head -n 20
+  git status --short 2>/dev/null | head_n 20
 fi
 echo ""
 
@@ -144,7 +153,7 @@ for pattern in "${TEMP_PATTERNS[@]}"; do
     [ -z "$b" ] && continue
     # Skip les branches "officielles"
     case "$b" in
-      ats-lab/*|main|develop|staging|production) continue ;;
+      ats-lab/*|main|develop|staging|production|backup/*) continue ;;
     esac
     echo "  → $b"
     TEMP_COUNT=$((TEMP_COUNT+1))
@@ -180,7 +189,14 @@ done
 echo ""
 
 if [ "${#BACKUPS[@]}" -gt "$KEEP_BACKUPS" ]; then
-  TO_DELETE=("${BACKUPS[@]:$KEEP_BACKUPS}")
+  # Compter combien à supprimer
+  TO_DELETE=()
+  i=0
+  for b in "${BACKUPS[@]}"; do
+    i=$((i+1))
+    [ "$i" -gt "$KEEP_BACKUPS" ] && TO_DELETE+=("$b")
+  done
+
   log "${#TO_DELETE[@]} backup(s) à supprimer:"
   for b in "${TO_DELETE[@]}"; do
     echo "  → $b"
@@ -249,7 +265,7 @@ while IFS= read -r line; do
       fi
       ;;
   esac
-done < <(git status --porcelain 2>/dev/null | grep '^??')
+done < <(git status --porcelain 2>/dev/null | grep '^??' || true)
 
 if [ "$PARASITE_COUNT" -eq 0 ]; then
   ok "Aucun fichier parasite non traqué"
@@ -278,7 +294,7 @@ else
   if [ -z "$(git status --porcelain)" ]; then
     ok "  clean"
   else
-    git status --short | head -n 10 | sed 's/^/  /'
+    git status --short 2>/dev/null | head_n 10 | sed 's/^/  /'
   fi
 fi
 echo ""
@@ -288,9 +304,14 @@ sep
 if [ "$DRY_RUN" -eq 1 ]; then
   warn "DRY-RUN — aucune modification effectuée"
   info ""
-  info "Pour exécuter: ./scripts/cleanup-branches.sh --yes"
-  info "Pour inclure remote: ./scripts/cleanup-branches.sh --yes --remote"
-  info "Pour garder N backups: ./scripts/cleanup-branches.sh --yes --keep-backups 3"
+  info "Pour exécuter:"
+  info "  ./scripts/cleanup-branches.sh --yes"
+  info ""
+  info "Pour inclure le nettoyage des branches distantes:"
+  info "  ./scripts/cleanup-branches.sh --yes --remote"
+  info ""
+  info "Pour garder seulement N backups:"
+  info "  ./scripts/cleanup-branches.sh --yes --keep-backups 3"
 else
   ok "Nettoyage terminé"
 fi
