@@ -1,64 +1,29 @@
-# ALTEN Internal ATS Copilot 🤖💼
+# ATS Copilot Dashboard
 
-**Lab FDE (Forward Deployed Engineer) – Cas d'usage IA pour les Fonctions Support (RH)**
+[![Dashboard CI](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/dashboard-ci.yml/badge.svg)](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/dashboard-ci.yml)
+[![A11y CI](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/a11y-ci.yml/badge.svg)](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/a11y-ci.yml)
+[![i18n CI](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/i18n-ci.yml/badge.svg)](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/i18n-ci.yml)
+[![Storybook CI](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/storybook-ci.yml/badge.svg)](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/storybook-ci.yml)
+[![Security CI](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/security-ci.yml/badge.svg)](https://github.com/AbirhaouiSalah/FDE_LAB/actions/workflows/security-ci.yml)
 
-Projet de cadrage, prototypage rapide et évaluation automatisée des candidatures pour la cellule FDE ALTEN.
+Copilote IA pour le pré-screening des candidats FDE (France / Porto).
 
-## 🎯 Contexte & Enjeux Métier
+## Contexte
 
-Dans le cadre de l'accélération de l'usage de l'IA chez ALTEN, la DSI Groupe et le Chief AI Officer constituent une équipe de Forward Deployed Engineers (FDE). L'un des projets prioritaires pour les fonctions support (RH) consiste à optimiser le recrutement et l'évaluation des profils techniques complexes (FDE, Solution Architects, DevOps).
+- **Client** : ALTEN — équipe Forward Deployed Engineer (FDE)
+- **Use case** : copilote IA pour le pré-screening des candidats FDE
+- **Principe cardinal** : l'humain décide toujours. Le dashboard est **read-only**
+- **KPI cible** : −50 % sur le temps médian de pré-screening par candidat
+- **Conformité** : RGPD, EU AI Act (Annexe III), résidence EU des données
 
-**Points de friction identifiés :**
+## Prérequis
 
-1. **Volumétrie & temps de qualification** : screening manuel chronophage de CVs à forte technicité.
-2. **Alignement Métier / Tech** : évaluation délicate des profils hybrides (Python/API + posture de consultant terrain).
-3. **Expérience recruteur** : besoin de grilles d'entretien automatisées et objectives pour accélérer le Time-to-Hire.
+- Node ≥ 20 (recommandé : 22)
+- pnpm ≥ 9 (`corepack enable && corepack prepare pnpm@9.6.0 --activate`)
 
-## 💡 Solution Proposée : ATS Copilot
-
-Un assistant agentique qui s'intègre au système ATS interne pour :
-
-1. **Parser & structurer** les CVs reçus.
-2. **Évaluer & scorer** l'adéquation candidat / fiche de poste via RAG et prompt engineering structuré.
-3. **Générer une fiche de synthèse** pour le recruteur : score de matching, skill gaps, grille de questions d'entretien.
-
-## 🏗️ Architecture du Projet
-
-```
-alten-internal-ats-copilot/
-├── .github/workflows/    # Pipeline CI/CD (Pytest)
-├── data/                 # Données de test (CVs anonymisés, fiches de poste)
-├── docs/                 # Cadrage FDE, notes d'ateliers RH et KPIs
-├── src/
-│   ├── parser/           # Extraction structurée (PDF/Texte)
-│   ├── evaluator/        # Moteur d'évaluation RAG & Agent LLM
-│   └── api/              # API REST FastAPI pour intégration ATS/RH
-├── tests/                # Tests unitaires Pytest
-├── requirements.txt
-└── README.md
-```
-
-## 🛠️ Stack Technique
-
-- **Langage** : Python 3.10+
-- **Agent / LLM** : Agentic RAG, Prompt Engineering (Pydantic / OpenAI / Mistral)
-- **API** : FastAPI, endpoints REST
-- **Qualité & CI/CD** : Pytest, GitHub Actions
-
-## 🚀 Démarrage Rapide
+## Démarrage rapide
 
 ```bash
-git clone https://github.com/votre-user/alten-internal-ats-copilot.git
-cd alten-internal-ats-copilot
-
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-pytest
-
-# Lancer l'API
-uvicorn src.api.main:app --reload
-```
-
----
-Projet réalisé par Salah-Eddine ABIRHAOUI - Candidature Forward Deployed Engineer (FDE) chez ALTEN.
+./scripts/run.sh install
+./scripts/run.sh dev      # http://localhost:5173
+./scripts/run.sh check    # lint + typecheck + test + build
