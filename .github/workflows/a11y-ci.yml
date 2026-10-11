@@ -1,0 +1,61 @@
+name: A11y CI
+
+on:
+  push:
+    branches: ['ats-lab/**', 'main']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: a11y-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  a11y-check:
+    name: A11y check (jest-axe)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: ${{ env.PNPM_VERSION }} }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile=false
+
+      - name: Check test:a11y script exists
+        id: check
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['test:a11y']?0:1)"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check a11y config exists
+        id: config
+        run: |
+          if [ -f vitest.a11y.config.ts ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::vitest.a11y.config.ts absent — a11y tests skipped"
+          fi
+
+      - name: Run a11y tests
+        if: steps.check.outputs.exists == 'true' && steps.config.outputs.exists == 'true'
+        run: pnpm test:a11y
+
+      - name: Notice
+        if: steps.check.outputs.exists != 'true' || steps.config.outputs.exists != 'true'
+        run: echo "A11y tests skipped (config or script missing)"
