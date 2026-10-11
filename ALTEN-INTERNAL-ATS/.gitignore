@@ -1,26 +1,13 @@
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-venv/
-ENV/
-
-# Environment variables
+node_modules/
+dist/
+coverage/
 .env
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Local mock data (privacy)
-data/resumes/*
-!data/resumes/.gitkeep
-data/job_descriptions/*
-!data/job_descriptions/.gitkeep
+.env.*
+!.env.example
+*.log
+.DS_Store
+.vite/
+playwright-report/
+test-results/
+storybook-static/
+*.bak
