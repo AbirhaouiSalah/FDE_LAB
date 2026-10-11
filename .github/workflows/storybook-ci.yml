@@ -1,0 +1,56 @@
+name: Storybook CI
+
+on:
+  push:
+    branches: ['ats-lab/**', 'main']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: storybook-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  build-storybook:
+    name: Build Storybook
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: ${{ env.PNPM_VERSION }} }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile=false
+
+      - name: Check build-storybook script exists
+        id: check
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['build-storybook']?0:1)"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::build-storybook absent — Storybook not configured yet"
+          fi
+
+      - name: Build Storybook
+        if: steps.check.outputs.exists == 'true'
+        run: pnpm build-storybook
+
+      - name: Upload Storybook artifact
+        if: steps.check.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-${{ github.ref_name }}
+          path: storybook-static/
+          if-no-files-found: warn
