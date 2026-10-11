@@ -26,7 +26,6 @@ cd "$ROOT_DIR"
 
 FILES=(
   "scripts/run.sh"
-  "scripts/run.ps1"
   ".npmrc"
   "package.json"
   "pnpm-lock.yaml"
