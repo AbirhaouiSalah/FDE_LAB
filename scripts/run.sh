@@ -1,3 +1,4 @@
+# MY MODIF
 #!/usr/bin/env bash
 # scripts/run.sh — Point d'entrée unique pour le dev workflow
 # Usage: ./scripts/run.sh <commande> [args]
