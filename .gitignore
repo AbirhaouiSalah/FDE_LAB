@@ -1,12 +1,60 @@
+cd /Users/salahabirhaoui/Applications/workspace/fde_lab/FDE_LAB
+
+cat > .gitignore <<'EOF'
+# === Node / pnpm ===
 node_modules/
 dist/
 coverage/
+.vite/
+*.log
+.pnpm-store/
+
+# === Environment ===
 .env
 .env.*
 !.env.example
-*.log
+
+# === macOS ===
 .DS_Store
-.vite/
+._*
+
+# === Tests ===
 playwright-report/
 test-results/
+
+# === Storybook ===
 storybook-static/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# === IDE ===
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# === Backups ===
+*.bak
+*.orig
+*.rej
+
+# === CI reports ===
+.ci-reports/
+
+# === Worktrees temporaires ===
+.sync-worktrees/
+.align-worktrees/
+.push-worktrees/
+.modify-worktrees/
+EOF
