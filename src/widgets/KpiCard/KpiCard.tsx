@@ -1,5 +1,4 @@
 import React from 'react';
-import { SmallGroupGuard } from '../SmallGroupGuard';
 
 export type KpiStatus = 'ok' | 'watch' | 'alert';
 
@@ -12,8 +11,9 @@ export interface KpiCardProps {
   status?: KpiStatus;
   lastRefresh?: string;
   href?: string;
-  /** Nombre de candidats dans le groupe. Si < 5, l'agrégat est masqué (RGPD). */
   n?: number;
+  lowerIsBetter?: boolean;
+  spark?: number[];
 }
 
 export function formatValue(value: number, unit?: KpiCardProps['unit']): string {
@@ -32,64 +32,87 @@ export function deltaPct(value: number, baseline?: number): number | null {
   return ((value - baseline) / baseline) * 100;
 }
 
-function KpiCardInner(props: KpiCardProps) {
+function Spark({ points, positive }: { points: number[]; positive: boolean }) {
+  if (!points.length) return null;
+  const w = 120, h = 24;
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const step = w / (points.length - 1);
+  const d = points
+    .map((p, i) => {
+      const x = i * step;
+      const y = h - ((p - min) / range) * h;
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+  const stroke = positive ? 'var(--color-ok)' : 'var(--color-alert)';
+  return (
+    <svg className="kpi__spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden="true">
+      <path d={d} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function KpiCard(props: KpiCardProps) {
   const {
-    label, value, unit, baseline, target,
-    status = 'ok', lastRefresh, href,
+    label, value, unit, baseline, target, status = 'ok',
+    lastRefresh, href, n, lowerIsBetter = false, spark,
   } = props;
 
   const delta = deltaPct(value, baseline);
-  const sign  = delta === null ? '' : delta >= 0 ? '+' : '';
+  const isGood = delta === null ? true : lowerIsBetter ? delta <= 0 : delta >= 0;
+  const deltaClass = delta === null ? 'neutral' : isGood ? 'good' : 'bad';
+  const sign = delta === null || delta >= 0 ? '+' : '';
+  const positive = spark && spark.length > 1 ? spark[spark.length - 1] <= spark[0] : true;
+
+  if (n !== undefined && n < 5) {
+    return (
+      <article
+        data-testid="kpi-card"
+        data-status={status}
+        aria-label={`${label}: agrégat masqué (n<5)`}
+        className="card"
+      >
+        <p className="kpi__label">{label}</p>
+        <p style={{ margin: '8px 0 0' }}>
+          <span className="small-group">
+            <span aria-hidden="true">n&lt;5</span>
+            <span className="sr-only">Agrégat masqué : groupe inférieur à 5</span>
+          </span>
+        </p>
+      </article>
+    );
+  }
 
   return (
     <article
       data-testid="kpi-card"
       data-status={status}
       aria-label={`${label}: ${formatValue(value, unit)}`}
-      className={`kpi-card kpi-card--${status}`}
+      className="card card--hover"
     >
-      <h3 className="kpi-card__label">{label}</h3>
-      <p className="kpi-card__value">{formatValue(value, unit)}</p>
-
-      {delta !== null && (
-        <p className="kpi-card__delta" data-testid="kpi-card-delta">
-          {sign}{delta.toFixed(1)} % vs baseline
-        </p>
-      )}
-
-      {target !== undefined && (
-        <p className="kpi-card__target" data-testid="kpi-card-target">
-          Cible : {formatValue(target, unit)}
-        </p>
-      )}
-
-      {lastRefresh && (
-        <p className="kpi-card__refresh">
-          Dernière mise à jour : {lastRefresh}
-        </p>
-      )}
-
-      {href && (
-        <a
-          className="kpi-card__link"
-          href={href}
-          aria-label={`Voir la définition de ${label}`}
-        >
-          Définition
-        </a>
-      )}
+      <div className="kpi">
+        <p className="kpi__label">{label}</p>
+        <div className="kpi__value-row">
+          <span className="kpi__value">{formatValue(value, unit)}</span>
+          {delta !== null && (
+            <span className={`kpi__delta kpi__delta--${deltaClass}`} data-testid="kpi-card-delta">
+              <span aria-hidden="true">{delta >= 0 ? '▲' : '▼'}</span>
+              {sign}{delta.toFixed(1)} %
+            </span>
+          )}
+        </div>
+        {spark && spark.length > 1 && <Spark points={spark} positive={positive} />}
+        <div className="kpi__meta">
+          {target !== undefined && <span>Cible : {formatValue(target, unit)}</span>}
+          {lastRefresh && <span>MAJ {new Date(lastRefresh).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit' })}</span>}
+        </div>
+        {href && (
+          <a className="kpi__link" href={href} aria-label={`Voir la définition de ${label}`}>
+            Voir la définition →
+          </a>
+        )}
+      </div>
     </article>
   );
-}
-
-export function KpiCard(props: KpiCardProps) {
-  const { n, label } = props;
-  if (n !== undefined && n < 5) {
-    return (
-      <SmallGroupGuard n={n} context={label}>
-        {null}
-      </SmallGroupGuard>
-    );
-  }
-  return <KpiCardInner {...props} />;
 }
