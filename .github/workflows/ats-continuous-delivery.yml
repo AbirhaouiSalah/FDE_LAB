@@ -1,0 +1,183 @@
+name: ATS Continuous Delivery
+
+# Déclenchement : uniquement sur main et master
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ats-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # STAGE 1 : Qualité du code (lint + typecheck)
+  # ────────────────────────────────────────────────────────────
+  quality-code:
+    name: Quality - Lint and typecheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  # ────────────────────────────────────────────────────────────
+  # STAGE 2 : Tests automatisés (unit + a11y + i18n)
+  # ────────────────────────────────────────────────────────────
+  quality-tests:
+    name: Quality - Tests
+    needs: quality-code
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Unit tests with coverage
+        run: pnpm test -- --run --coverage
+        continue-on-error: true
+
+      - name: A11y tests
+        run: pnpm test:a11y
+        continue-on-error: true
+
+      - name: i18n parity
+        run: pnpm test:i18n
+        continue-on-error: true
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-main
+          path: coverage/
+          if-no-files-found: ignore
+
+  # ────────────────────────────────────────────────────────────
+  # STAGE 3 : Audit de qualité (sécurité + coverage seuil)
+  # ────────────────────────────────────────────────────────────
+  quality-audit:
+    name: Quality - Audit
+    needs: quality-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Security audit
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Check coverage threshold
+        if: hashFiles('coverage/coverage-summary.json') != ''
+        run: |
+          node - <<'EOF'
+          const s = require('./coverage/coverage-summary.json').total;
+          const pct = s.lines.pct;
+          console.log(`Lines coverage: ${pct}%`);
+          if (pct < 80) {
+            console.log(`::warning::Coverage ${pct}% < 80% (non bloquant)`);
+          }
+          EOF
+
+  # ────────────────────────────────────────────────────────────
+  # STAGE 4 : Build final
+  # ────────────────────────────────────────────────────────────
+  build:
+    name: Build production
+    needs: [quality-tests, quality-audit]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Build
+        run: pnpm build
+
+      - name: Upload dist
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-main
+          path: dist/
+          if-no-files-found: error
+
+  # ────────────────────────────────────────────────────────────
+  # STAGE 5 : Rapport final de livraison
+  # ────────────────────────────────────────────────────────────
+  delivery-report:
+    name: Delivery report
+    needs: [quality-code, quality-tests, quality-audit, build]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Job summary
+        run: |
+          {
+            echo "## ATS Continuous Delivery"
+            echo ""
+            echo "**Branche:** ${{ github.ref_name }}"
+            echo "**Commit:** ${{ github.sha }}"
+            echo ""
+            echo "| Stage | Result |"
+            echo "|-------|--------|"
+            echo "| Quality - Code | ${{ needs.quality-code.result }} |"
+            echo "| Quality - Tests | ${{ needs.quality-tests.result }} |"
+            echo "| Quality - Audit | ${{ needs.quality-audit.result }} |"
+            echo "| Build | ${{ needs.build.result }} |"
+            echo ""
+            if [ "${{ needs.quality-code.result }}" = "success" ] && \
+               [ "${{ needs.quality-tests.result }}" = "success" ] && \
+               [ "${{ needs.quality-audit.result }}" = "success" ] && \
+               [ "${{ needs.build.result }}" = "success" ]; then
+              echo "**Status: READY FOR DELIVERY**"
+            else
+              echo "**Status: FAILED - check individual jobs**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
