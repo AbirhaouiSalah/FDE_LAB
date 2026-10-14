@@ -1,43 +1,42 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { Heatmap } from './Heatmap';
-import type { HeatCell } from '../../mock/data';
+// src/widgets/Heatmap/Heatmap.test.tsx
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { Heatmap } from "./Heatmap";
 
-describe('Heatmap', () => {
-  const cells: HeatCell[] = [
-    { dimension: 'Site', group: 'FR', value: 8.4, n: 220 },
-    { dimension: 'Site', group: 'PT', value: 9.2, n: 122 },
-    { dimension: 'Cohorte', group: 'Junior', value: 9.6, n: 154 },
-    { dimension: 'Cohorte', group: 'Stage', value: 10.2, n: 42 },
-  ];
+const rows = ["Nord", "Sud"];
+const cols = ["Q1", "Q2"];
+const cells = [
+  { row: "Nord", col: "Q1", value: 10, sampleSize: 20 },
+  { row: "Nord", col: "Q2", value: 20, sampleSize: 20 },
+  { row: "Sud",  col: "Q1", value: 15, sampleSize: 2 }, // trop petit
+  { row: "Sud",  col: "Q2", value: 25, sampleSize: 20 },
+];
 
-  it('renders a table with aria-label', () => {
-    render(<Heatmap cells={cells} />);
-    expect(screen.getByRole('table', { name: /heatmap/i })).toBeInTheDocument();
+describe("Heatmap", () => {
+  it("rend une cellule par case", () => {
+    const { container } = render(
+      <Heatmap label="Heat" rows={rows} cols={cols} cells={cells} k={5} />
+    );
+    expect(container.querySelectorAll("td")).toHaveLength(4);
   });
 
-  it('exposes data-testid=heatmap', () => {
-    render(<Heatmap cells={cells} />);
-    expect(screen.getByTestId('heatmap')).toBeInTheDocument();
+  it("masque les cellules sous le seuil k", () => {
+    const { container } = render(
+      <Heatmap label="Heat" rows={rows} cols={cols} cells={cells} k={5} />
+    );
+    expect(container.querySelectorAll("[data-masked='true']")).toHaveLength(1);
   });
 
-  it('renders one row per dimension', () => {
-    render(<Heatmap cells={cells} />);
-    expect(screen.getByText('Site')).toBeInTheDocument();
-    expect(screen.getByText('Cohorte')).toBeInTheDocument();
+  it("affiche une note quand des cellules sont masquées", () => {
+    render(<Heatmap label="Heat" rows={rows} cols={cols} cells={cells} k={5} />);
+    expect(screen.getByText(/masquées/)).toBeInTheDocument();
   });
 
-  it('renders the value inside each cell', () => {
-    render(<Heatmap cells={cells} />);
-    expect(screen.getByText('8.4')).toBeInTheDocument();
-    expect(screen.getByText('9.2')).toBeInTheDocument();
-  });
-
-  it('masks cells with n < 5 with n<5', () => {
-    const small: HeatCell[] = [
-      { dimension: 'Site', group: 'FR', value: 8.4, n: 3 },
-    ];
-    render(<Heatmap cells={small} />);
-    expect(screen.getByText('n<5')).toBeInTheDocument();
+  it("affiche une cellule vide si absente", () => {
+    const partial = [{ row: "Nord", col: "Q1", value: 10, sampleSize: 20 }];
+    const { container } = render(
+      <Heatmap label="Heat" rows={rows} cols={cols} cells={partial} k={5} />
+    );
+    expect(container.querySelectorAll("[data-masked='true']").length).toBeGreaterThan(0);
   });
 });
