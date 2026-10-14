@@ -39,7 +39,7 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::build-storybook absent — Storybook not configured yet"
+            echo "::notice::build-storybook absent  Storybook not configured yet"
           fi
 
       - name: Build Storybook
