@@ -4,7 +4,7 @@ import { FUNNEL, TIMESERIES } from '../mock/data';
 
 export function Pipeline() {
   return (
-    <>
+    <div data-testid="pipeline-page">
       <div className="main__header">
         <h1 className="main__title">Pipeline</h1>
         <p className="main__subtitle">Entonnoir complet et évolution temporelle</p>
@@ -19,6 +19,6 @@ export function Pipeline() {
         <h2 className="card__title">Temps médian par site — 14 jours</h2>
         <TimeSeries data={TIMESERIES} yLabel="min" />
       </div>
-    </>
+    </div>
   );
 }

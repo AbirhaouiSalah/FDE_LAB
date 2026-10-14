@@ -66,10 +66,7 @@ export function KpiCard(props: KpiCardProps) {
 
   if (n !== undefined && n < 5) {
     return (
-      <article
-        data-testid="kpi-card"
-        data-status={status}
-        aria-label={`${label}: agrégat masqué (n<5)`}
+      <article data-status={status} aria-label={`: agrégat masqué (n<5)`}
         className="card"
       >
         <p className="kpi__label">{label}</p>
@@ -103,8 +100,8 @@ export function KpiCard(props: KpiCardProps) {
         </div>
         {spark && spark.length > 1 && <Spark points={spark} positive={positive} />}
         <div className="kpi__meta">
-          {target !== undefined && <span>Cible : {formatValue(target, unit)}</span>}
-          {lastRefresh && <span>MAJ {new Date(lastRefresh).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit' })}</span>}
+          {target !== undefined && <span data-testid="kpi-card-target">Cible : {formatValue(target, unit)}</span>}
+          {lastRefresh && <span>Dernière mise à jour : {new Date(lastRefresh).toLocaleDateString("fr-FR")}</span>}
         </div>
         {href && (
           <a className="kpi__link" href={href} aria-label={`Voir la définition de ${label}`}>

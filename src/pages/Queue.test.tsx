@@ -5,6 +5,6 @@ import { Queue } from './Queue';
 describe('Queue', () => {
   it('renders', () => {
     render(<Queue />);
-    expect(screen.getByTestId('queue-page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@ import { HEATMAP } from '../mock/data';
 
 export function Fairness() {
   return (
-    <>
+    <div data-testid="fairness-page">
       <div className="main__header">
         <h1 className="main__title">Fairness</h1>
         <p className="main__subtitle">Écarts par dimension — les petits groupes (n&lt;5) sont masqués</p>
@@ -32,6 +32,6 @@ export function Fairness() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

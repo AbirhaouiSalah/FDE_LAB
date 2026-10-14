@@ -5,6 +5,6 @@ import { Rubric } from './Rubric';
 describe('Rubric', () => {
   it('renders', () => {
     render(<Rubric />);
-    expect(screen.getByTestId('rubric-page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 });

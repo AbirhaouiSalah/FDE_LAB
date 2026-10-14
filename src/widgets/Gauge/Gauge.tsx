@@ -10,7 +10,7 @@ export function Gauge({ value, label, size = 140 }: { value: number; label: stri
   const color = clamped >= 85 ? 'var(--color-ok)' : clamped >= 70 ? 'var(--color-watch)' : 'var(--color-alert)';
 
   return (
-    <div className="gauge-wrap">
+    <div className="gauge-wrap" data-testid="gauge">
       <div className="gauge" style={{ width: size }}>
         <svg viewBox={`0 0 ${size} 80`} width={size} height={80} aria-hidden="true">
           <path d={`M ${cx - r},${cy} A ${r},${r} 0 0 1 ${cx + r},${cy}`} fill="none" stroke="var(--color-border)" strokeWidth="10" strokeLinecap="round" />

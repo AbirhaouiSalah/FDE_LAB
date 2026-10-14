@@ -6,7 +6,7 @@ import { KPIS, ALERTS, FUNNEL, TIMESERIES, RUBRIC_META } from '../mock/data';
 
 export function Overview() {
   return (
-    <>
+    <div data-testid="overview-page">
       <div className="main__header">
         <h1 className="main__title">Vue d'ensemble</h1>
         <p className="main__subtitle">Rubric {RUBRIC_META.version} · Site FR + PT · Données fictives, aucune PII</p>
@@ -51,6 +51,6 @@ export function Overview() {
         <h2 className="card__title">Temps médian de pré-screening — 14 derniers jours</h2>
         <TimeSeries data={TIMESERIES} yLabel="min" />
       </div>
-    </>
+    </div>
   );
 }

@@ -5,7 +5,7 @@ import { GAUGES, TIMESERIES, HEATMAP } from '../mock/data';
 
 export function Quality() {
   return (
-    <>
+    <div data-testid="quality-page">
       <div className="main__header">
         <h1 className="main__title">Qualité</h1>
         <p className="main__subtitle">Taux d'accord et confiance du copilote</p>
@@ -26,6 +26,6 @@ export function Quality() {
         <h2 className="card__title">Détail par dimension</h2>
         <Heatmap cells={HEATMAP} />
       </div>
-    </>
+    </div>
   );
 }

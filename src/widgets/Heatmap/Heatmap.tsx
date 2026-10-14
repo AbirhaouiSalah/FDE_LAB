@@ -16,7 +16,7 @@ export function Heatmap({ cells }: { cells: HeatCell[] }) {
   const min = Math.min(...values), max = Math.max(...values);
 
   return (
-    <table className="heat" aria-label="Heatmap par dimension">
+    <table className="heat" aria-label="Heatmap par dimension" data-testid="heatmap">
       <thead>
         <tr>
           <th style={{ textAlign: 'left' }}>Dimension</th>

@@ -1,11 +1,12 @@
-
 export interface FunnelStage { label: string; value: number; }
 
 export function FunnelChart({ stages }: { stages: FunnelStage[] }) {
-  if (!stages.length) return <div className="empty">Aucune étape</div>;
+  if (!stages.length) {
+    return <div className="empty" data-testid="funnel-chart">Aucune étape</div>;
+  }
   const max = stages[0].value;
   return (
-    <div className="funnel">
+    <div className="funnel" data-testid="funnel-chart">
       {stages.map((s, i) => {
         const pct = (s.value / max) * 100;
         const prev = i === 0 ? s.value : stages[i - 1].value;

@@ -4,7 +4,7 @@ import { ALERTS, GAUGES } from '../mock/data';
 
 export function Operations() {
   return (
-    <>
+    <div data-testid="operations-page">
       <div className="main__header">
         <h1 className="main__title">Operations</h1>
         <p className="main__subtitle">Supervision MCO — alertes et santé du service</p>
@@ -22,6 +22,6 @@ export function Operations() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

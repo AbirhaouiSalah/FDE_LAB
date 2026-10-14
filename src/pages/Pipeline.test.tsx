@@ -5,6 +5,6 @@ import { Pipeline } from './Pipeline';
 describe('Pipeline', () => {
   it('renders', () => {
     render(<Pipeline />);
-    expect(screen.getByTestId('pipeline-page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 });

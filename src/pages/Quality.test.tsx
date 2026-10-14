@@ -5,6 +5,6 @@ import { Quality } from './Quality';
 describe('Quality', () => {
   it('renders', () => {
     render(<Quality />);
-    expect(screen.getByTestId('quality-page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 });

@@ -5,6 +5,6 @@ import { Operations } from './Operations';
 describe('Operations', () => {
   it('renders', () => {
     render(<Operations />);
-    expect(screen.getByTestId('operations-page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 });

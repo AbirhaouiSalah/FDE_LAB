@@ -10,7 +10,7 @@ const CRITERIA = [
 
 export function Rubric() {
   return (
-    <>
+    <div data-testid="rubric-page">
       <div className="main__header">
         <h1 className="main__title">Rubric {RUBRIC_META.version}</h1>
         <p className="main__subtitle">Critères utilisés par le copilote — le recruteur garde la décision finale</p>
@@ -31,6 +31,6 @@ export function Rubric() {
           </tbody>
         </table>
       </div>
-    </>
+    </div>
   );
 }

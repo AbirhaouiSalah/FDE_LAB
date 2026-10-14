@@ -2,7 +2,7 @@ import { RUBRIC_META } from '../mock/data';
 
 export function Governance() {
   return (
-    <>
+    <div data-testid="governance-page">
       <div className="main__header">
         <h1 className="main__title">Governance</h1>
         <p className="main__subtitle">Conformité RGPD, EU AI Act, traçabilité</p>
@@ -27,6 +27,6 @@ export function Governance() {
           <dt style={{ color: 'var(--color-text-muted)' }}>Note</dt><dd style={{ margin: 0 }}>{RUBRIC_META.note}</dd>
         </dl>
       </div>
-    </>
+    </div>
   );
 }

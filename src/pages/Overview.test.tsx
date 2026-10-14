@@ -5,6 +5,6 @@ import { Overview } from './Overview';
 describe('Overview', () => {
   it('renders', () => {
     render(<Overview />);
-    expect(screen.getByTestId('overview-page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 });

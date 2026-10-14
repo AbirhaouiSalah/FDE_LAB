@@ -7,7 +7,7 @@ export interface TimeSeriesProps {
 }
 
 export function TimeSeries({ data, yLabel = 'min', height = 220 }: TimeSeriesProps) {
-  if (!data.length) return <div className="empty">Aucune donnée</div>;
+  if (!data.length) return <div className="empty" data-testid="time-series">Aucune donnée</div>;
 
   const w = 800, h = height;
   const padL = 40, padR = 16, padT = 16, padB = 28;

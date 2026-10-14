@@ -8,7 +8,7 @@ describe('KpiCard — formatValue', () => {
   it('formats h',   () => expect(formatValue(2.5, 'h')).toBe('2.5 h'));
   it('formats d',   () => expect(formatValue(1.5, 'd')).toBe('1.5 j'));
   it('formats count with fr-FR locale', () =>
-    expect(formatValue(12345, 'count')).toBe('12 345'));
+    expect(formatValue(12345, 'count')).toBe('12\u202f345'));
   it('returns raw string when unit undefined', () =>
     expect(formatValue(42)).toBe('42'));
 });

@@ -7,17 +7,13 @@ const STATUS_LABEL: Record<QueueRow['status'], { label: string; cls: string }> =
 };
 
 export function QueueTable({ rows }: { rows: QueueRow[] }) {
-  if (!rows.length) return <div className="empty">File vide</div>;
+  if (!rows.length) {
+    return <div className="empty" data-testid="queue-table">File vide</div>;
+  }
   return (
-    <table className="queue">
+    <table className="queue" data-testid="queue-table">
       <thead>
-        <tr>
-          <th>ID</th>
-          <th>Site</th>
-          <th>Score</th>
-          <th>Statut</th>
-          <th>Attente</th>
-        </tr>
+        <tr><th>ID</th><th>Site</th><th>Score</th><th>Statut</th><th>Attente</th></tr>
       </thead>
       <tbody>
         {rows.map(r => {

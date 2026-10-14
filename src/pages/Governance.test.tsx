@@ -5,6 +5,6 @@ import { Governance } from './Governance';
 describe('Governance', () => {
   it('renders', () => {
     render(<Governance />);
-    expect(screen.getByTestId('governance-page')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 });
