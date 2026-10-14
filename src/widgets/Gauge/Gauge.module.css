@@ -1,0 +1,13 @@
+/* src/widgets/Gauge/Gauge.module.css */
+.figure {
+  margin: 0;
+  padding: 12px;
+  background: var(--c-surface, #fff);
+  border: 1px solid var(--c-border, #e3e6eb);
+  border-radius: var(--radius-md, 8px);
+  text-align: center;
+}
+.svg { width: 100%; max-width: 200px; height: auto; display: block; margin: 0 auto; }
+.caption { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.label { font-size: var(--fs-sm, 13px); color: var(--c-text-muted, #5b6472); }
+.value { font-size: var(--fs-lg, 16px); font-weight: 600; }
