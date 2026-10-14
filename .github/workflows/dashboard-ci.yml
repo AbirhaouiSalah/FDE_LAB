@@ -11,21 +11,14 @@ concurrency:
   group: dashboard-ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Moindre privilège par défaut
 permissions:
   contents: read
 
 env:
   NODE_VERSION: '22'
-  PNPM_VERSION: '9'
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
-  # 
-────────────────────────────────────────────────────────────
-  # 1. Validate branch name
-  # 
-────────────────────────────────────────────────────────────
   validate-branch-name:
     name: Validate branch name
     if: >-
@@ -37,24 +30,15 @@ jobs:
         run: |
           set -euo pipefail
           B="${GITHUB_REF#refs/heads/}"
-          
-RE='^(ats-lab/)?(comp|feat|fix|chore|docs|spike)/[a-z0-9-]+(/[a-z0-9-]+)?$'
+          RE='^(ats-lab/)?(comp|feat|fix|chore|docs|spike)/[a-z0-9-]+(/[a-z0-9-]+)?$'
           if [[ ! "$B" =~ $RE ]]; then
-            echo "::error::Branch '$B' does not match naming 
-convention"
-            echo "Expected: [ats-lab/]<type>/<scope>[/<description>]"
-            echo "Types: comp | feat | fix | chore | docs | spike"
+            echo "::error::Branch '$B' does not match naming convention"
             exit 1
           fi
           echo "Branch name ok: $B"
 
-  # 
-────────────────────────────────────────────────────────────
-  # 2. Lint + typecheck
-  # 
-────────────────────────────────────────────────────────────
   lint-and-typecheck:
-    name: Lint & typecheck
+    name: Lint and typecheck
     needs: validate-branch-name
     if: >-
       always()
@@ -63,29 +47,19 @@ convention"
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false
-
+      - run: pnpm install --frozen-lockfile=false
       - name: Lint
-        run: pnpm lint --if-present
-
+        run: pnpm lint
       - name: Typecheck
-        run: pnpm typecheck --if-present
+        run: pnpm typecheck
 
-  # 
-────────────────────────────────────────────────────────────
-  # 3. Unit & component tests (avec coverage)
-  # 
-────────────────────────────────────────────────────────────
   unit-tests:
-    name: Unit & component tests
+    name: Unit and component tests
     needs: [validate-branch-name, lint-and-typecheck]
     if: >-
       always()
@@ -94,34 +68,15 @@ convention"
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false
-
+      - run: pnpm install --frozen-lockfile=false
       - name: Run tests with coverage
-        run: pnpm test --if-present -- --run --coverage
+        run: pnpm test -- --run --coverage
         continue-on-error: true
-
-      - name: Check coverage threshold (warning only)
-        if: always() && hashFiles('coverage/coverage-summary.json') != 
-''
-        run: |
-          node - <<'EOF'
-          const s = require('./coverage/coverage-summary.json').total;
-          const pct = s.lines.pct;
-          console.log(`Lines coverage: ${pct}%`);
-          if (pct < 80) {
-            console.log(`::warning::Coverage ${pct}% < 80% (non 
-bloquant pour l'instant)`);
-          }
-          EOF
-
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -130,11 +85,6 @@ bloquant pour l'instant)`);
           path: coverage/
           if-no-files-found: ignore
 
-  # 
-────────────────────────────────────────────────────────────
-  # 4. A11y tests (n'exécute que si la config existe)
-  # 
-────────────────────────────────────────────────────────────
   a11y-tests:
     name: A11y tests
     needs: [validate-branch-name, lint-and-typecheck]
@@ -145,72 +95,33 @@ bloquant pour l'instant)`);
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false
-
-      - name: Check test:a11y script exists
-        id: check
-        run: |
-          if node -e 
-"process.exit(require('./package.json').scripts?.['test:a11y']?0:1)"; 
-then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::test:a11y absent — job skipped"
-          fi
-
-      - name: Check a11y config exists
-        id: config
-        run: |
-          if [ -f vitest.a11y.config.ts ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
+      - run: pnpm install --frozen-lockfile=false
       - name: Run a11y tests
-        if: steps.check.outputs.exists == 'true' && 
-steps.config.outputs.exists == 'true'
         run: pnpm test:a11y
 
-  # 
-────────────────────────────────────────────────────────────
-  # 5. Build
-  # 
-────────────────────────────────────────────────────────────
   build:
     name: Build
     needs: [unit-tests, a11y-tests]
     if: >-
       always()
-      && (needs.unit-tests.result == 'success' || 
-needs.unit-tests.result == 'skipped')
-      && (needs.a11y-tests.result == 'success' || 
-needs.a11y-tests.result == 'skipped')
+      && (needs.unit-tests.result == 'success' || needs.unit-tests.result == 'skipped')
+      && (needs.a11y-tests.result == 'success' || needs.a11y-tests.result == 'skipped')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false
-
+      - run: pnpm install --frozen-lockfile=false
       - name: Build
-        run: pnpm build --if-present
-
+        run: pnpm build
       - name: Upload dist
         if: always()
         uses: actions/upload-artifact@v4
@@ -219,15 +130,9 @@ needs.a11y-tests.result == 'skipped')
           path: dist/
           if-no-files-found: error
 
-  # 
-────────────────────────────────────────────────────────────
-  # 6. Report & auto-commit (seul job avec write)
-  # 
-────────────────────────────────────────────────────────────
   ci-report-and-commit:
-    name: Report & auto-commit
-    needs: [validate-branch-name, lint-and-typecheck, unit-tests, 
-a11y-tests, build]
+    name: Report and auto-commit
+    needs: [validate-branch-name, lint-and-typecheck, unit-tests, a11y-tests, build]
     if: always() && github.event_name == 'push'
     runs-on: ubuntu-24.04
     permissions:
@@ -237,22 +142,18 @@ a11y-tests, build]
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Configure git
         run: |
           git config user.name  "AbirhaouiSalah"
           git config user.email "sabirhaouipro@gmail.com"
-
       - name: Prepare report folder
         run: mkdir -p .ci-reports
-
       - name: Write CI status report
         env:
           BRANCH: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
           ACTOR: ${{ github.actor }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository 
-}}/actions/runs/${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RES_VALIDATE: ${{ needs.validate-branch-name.result }}
           RES_LINT: ${{ needs.lint-and-typecheck.result }}
           RES_TESTS: ${{ needs.unit-tests.result }}
@@ -264,50 +165,16 @@ a11y-tests, build]
           TS="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           cat > ".ci-reports/${SAFE_BRANCH}.md" <<EOF
           # CI Report — ${BRANCH}
-
           - **Commit:** \`${SHA}\`
           - **Actor:** ${ACTOR}
           - **Time:** ${TS}
           - **Run:** ${RUN_URL}
-
-          | Job | Result |
-          |-----|--------|
-          | validate-branch-name | ${RES_VALIDATE} |
-          | lint-and-typecheck   | ${RES_LINT} |
-          | unit-tests           | ${RES_TESTS} |
-          | a11y-tests           | ${RES_A11Y} |
-          | build                | ${RES_BUILD} |
           EOF
-          cat ".ci-reports/${SAFE_BRANCH}.md"
-
       - name: Commit and push report
         run: |
           set -euo pipefail
           if [[ -n "$(git status --porcelain .ci-reports)" ]]; then
             git add .ci-reports
-            git commit -m "ci: report for ${GITHUB_REF_NAME} @ 
-${GITHUB_SHA} [skip ci]"
+            git commit -m "ci: report for ${GITHUB_REF_NAME} @ ${GITHUB_SHA} [skip ci]"
             git push origin "HEAD:${GITHUB_REF_NAME}"
-          else
-            echo "No report changes to commit"
           fi
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "## Dashboard CI"
-            echo ""
-            echo "| Job | Result |"
-            echo "|-----|--------|"
-            echo "| validate-branch-name | ${{ 
-needs.validate-branch-name.result }} |"
-            echo "| lint-and-typecheck   | ${{ 
-needs.lint-and-typecheck.result }} |"
-            echo "| unit-tests           | ${{ needs.unit-tests.result 
-}} |"
-            echo "| a11y-tests           | ${{ needs.a11y-tests.result 
-}} |"
-            echo "| build                | ${{ needs.build.result }} 
-|"
-          } >> "$GITHUB_STEP_SUMMARY"
