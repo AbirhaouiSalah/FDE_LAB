@@ -63,3 +63,6 @@ scripts.zip
 # Local backups
 .backups/
 scripts.zip
+
+# Validation reports (generated)
+.validation-reports/
