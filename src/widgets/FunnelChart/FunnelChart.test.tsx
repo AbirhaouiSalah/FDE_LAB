@@ -1,41 +1,35 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { FunnelChart } from './FunnelChart';
+// src/widgets/FunnelChart/FunnelChart.test.tsx
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { FunnelChart } from "./FunnelChart";
 
-describe('FunnelChart', () => {
-  it('renders empty state when no stages', () => {
-    render(<FunnelChart stages={[]} />);
-    expect(screen.getByTestId('funnel-chart')).toHaveTextContent(/aucune étape/i);
+const stages = [
+  { label: "Candidatures", count: 100 },
+  { label: "Pré-sélection", count: 60 },
+  { label: "Entretien", count: 20 },
+];
+
+describe("FunnelChart", () => {
+  it("affiche chaque étape", () => {
+    render(<FunnelChart label="Entonnoir" stages={stages} />);
+    expect(screen.getByText("Candidatures")).toBeInTheDocument();
+    expect(screen.getByText("Pré-sélection")).toBeInTheDocument();
+    expect(screen.getByText("Entretien")).toBeInTheDocument();
   });
 
-  it('renders one row per stage', () => {
-    render(<FunnelChart stages={[
-      { label: 'Sourced', value: 1000 },
-      { label: 'Screened', value: 500 },
-      { label: 'Offer', value: 50 },
-    ]} />);
-    expect(screen.getByText('Sourced')).toBeInTheDocument();
-    expect(screen.getByText('Screened')).toBeInTheDocument();
-    expect(screen.getByText('Offer')).toBeInTheDocument();
+  it("affiche un message vide", () => {
+    render(<FunnelChart label="Vide" stages={[]} />);
+    expect(screen.getByText("Aucune donnée")).toBeInTheDocument();
   });
 
-  it('shows the raw value formatted in fr-FR', () => {
-    render(<FunnelChart stages={[{ label: 'Sourced', value: 1240 }]} />);
-    // 1 240 avec espace fine insécable
-    expect(screen.getByText(/1\s*240/)).toBeInTheDocument();
+  it("calcule les taux par rapport à la 1ère étape", () => {
+    render(<FunnelChart label="Entonnoir" stages={stages} />);
+    expect(screen.getByText("(60%)")).toBeInTheDocument();
+    expect(screen.getByText("(20%)")).toBeInTheDocument();
   });
 
-  it('shows conversion percentage for non-first stages', () => {
-    render(<FunnelChart stages={[
-      { label: 'Sourced', value: 1000 },
-      { label: 'Screened', value: 500 },
-    ]} />);
-    // 500/1000 = 50 %
-    expect(screen.getByText(/50\s*%/)).toBeInTheDocument();
-  });
-
-  it('shows em dash for the first stage (no conversion)', () => {
-    render(<FunnelChart stages={[{ label: 'Sourced', value: 1000 }]} />);
-    expect(screen.getByText('—')).toBeInTheDocument();
+  it("masque si minSampleSize < k", () => {
+    render(<FunnelChart label="Entonnoir" stages={stages} minSampleSize={3} k={5} />);
+    expect(screen.queryByText("Candidatures")).not.toBeInTheDocument();
   });
 });
