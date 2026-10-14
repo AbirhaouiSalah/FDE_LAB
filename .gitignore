@@ -57,4 +57,12 @@ venv/
 .align-worktrees/
 .push-worktrees/
 .modify-worktrees/
-EOF
+EOF.backups/
+scripts.zip
+
+# Local backups
+.backups/
+scripts.zip
+
+# Validation reports (generated)
+.validation-reports/
