@@ -1,33 +1,59 @@
-import type { QueueRow } from '../../mock/data';
+// src/widgets/QueueTable/QueueTable.tsx
+// Table read-only de la file d'attente. L'humain décide, la table affiche.
+import styles from "./QueueTable.module.css";
 
-const STATUS_LABEL: Record<QueueRow['status'], { label: string; cls: string }> = {
-  pending: { label: 'En attente', cls: 'pill--watch' },
-  review:  { label: 'À revoir',   cls: 'pill--alert' },
-  done:    { label: 'Traité',     cls: 'pill--ok' },
-};
+export interface QueueRow {
+  /** Identifiant technique (opaque, non-PII). */
+  id: string;
+  /** Libellé affiché (déjà traduit). */
+  label: string;
+  /** Statut textuel. */
+  status: string;
+  /** Priorité numérique (plus petit = plus prioritaire). */
+  priority?: number;
+  /** Date ISO de mise à jour (traçabilité). */
+  updatedAt?: string;
+}
 
-export function QueueTable({ rows }: { rows: QueueRow[] }) {
-  if (!rows.length) {
-    return <div className="empty" data-testid="queue-table">File vide</div>;
+export interface QueueTableProps {
+  rows: readonly QueueRow[];
+  /** Callback déclenché au clic d'une ligne (informatif). */
+  onSelect?: (id: string) => void;
+  /** Message vide. */
+  emptyMessage?: string;
+  caption?: string;
+}
+
+export function QueueTable({
+  rows, onSelect, emptyMessage = "Aucun élément", caption,
+}: QueueTableProps) {
+  if (rows.length === 0) {
+    return <div className={styles.empty} role="status">{emptyMessage}</div>;
   }
   return (
-    <table className="queue" data-testid="queue-table">
+    <table className={styles.table} data-widget="queue-table">
+      {caption && <caption className={styles.caption}>{caption}</caption>}
       <thead>
-        <tr><th>ID</th><th>Site</th><th>Score</th><th>Statut</th><th>Attente</th></tr>
+        <tr>
+          <th scope="col">Élément</th>
+          <th scope="col">Statut</th>
+          <th scope="col">Priorité</th>
+          <th scope="col">Mise à jour</th>
+        </tr>
       </thead>
       <tbody>
-        {rows.map(r => {
-          const st = STATUS_LABEL[r.status];
-          return (
-            <tr key={r.id}>
-              <td className="queue__id">{r.id}</td>
-              <td>{r.site}</td>
-              <td className="queue__score">{r.score}</td>
-              <td><span className={`pill ${st.cls}`}>{st.label}</span></td>
-              <td>{r.waiting}</td>
-            </tr>
-          );
-        })}
+        {rows.map((r) => (
+          <tr
+            key={r.id}
+            onClick={onSelect ? () => onSelect(r.id) : undefined}
+            className={onSelect ? styles.clickable : undefined}
+          >
+            <td>{r.label}</td>
+            <td>{r.status}</td>
+            <td>{r.priority ?? "—"}</td>
+            <td>{r.updatedAt ? r.updatedAt.slice(0, 10) : "—"}</td>
+          </tr>
+        ))}
       </tbody>
     </table>
   );
