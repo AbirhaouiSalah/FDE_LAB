@@ -347,6 +347,22 @@ propagate_to() {
   fi
 }
 
+# === ALIAS-COMPAT-V3 ===
+# Alias de compatibilité : anciennes API utilisées par certains lots.
+# NE PAS SUPPRIMER — même si certains semblent inutilisés aujourd'hui.
+
+ensure_clean_tree() { require_clean_tree "$@"; }
+ensure_clean()      { require_clean_tree "$@"; }
+check_prereqs()     { require_repo_root; require_cmd git; return 0; }
+log_info()          { info "$@"; }
+log_error()         { err "$@"; }
+log_success()       { ok "$@"; }
+log_debug()         { log_dim "$@"; }
+log_fatal()         { die "$@"; }
+assert_clean()      { require_clean_tree "$@"; }
+abort()             { die "$@"; }
+fatal()             { die "$@"; }
+
 # ─── Exécution sécurisée (DRY_RUN) ─────────────────────────────────────────
 run() {
   if [[ "${DRY_RUN:-0}" -eq 1 ]]; then

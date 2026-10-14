@@ -5,6 +5,14 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
+# ── Chemins canoniques (forcés) ──
+LOTS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$LOTS_ROOT/../.." && pwd)"
+export LOTS_ROOT REPO_ROOT
+
+# ── Chemins canoniques (forcés) ──
+REPO_ROOT="$(cd "$LOTS_ROOT/../.." && pwd)"
+
 # ─── Config ────────────────────────────────────────────────────────────────
 LOTS=(1 2 3 4 5 6 7)
 SKIP="${SKIP:-}"                       # ex: SKIP="2 3"
