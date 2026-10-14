@@ -48,7 +48,7 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::vitest.a11y.config.ts absent — a11y tests skipped"
+            echo "::warning::vitest.a11y.config.ts absent  a11y tests skipped"
           fi
 
       - name: Run a11y tests
