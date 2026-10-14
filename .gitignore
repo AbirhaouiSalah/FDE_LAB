@@ -59,3 +59,7 @@ venv/
 .modify-worktrees/
 EOF.backups/
 scripts.zip
+
+# Local backups
+.backups/
+scripts.zip
