@@ -32,7 +32,7 @@ export function TimeSeries({ data, yLabel = 'min', height = 220 }: TimeSeriesPro
   const yTickVals = Array.from({ length: yTicks + 1 }, (_, i) => min + (range * i) / yTicks);
 
   return (
-    <div>
+    <div data-testid="time-series">
       <svg className="ts" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label={`Série temporelle, ${yLabel}`}>
         <defs>
           <linearGradient id="grad-fr" x1="0" y1="0" x2="0" y2="1">
