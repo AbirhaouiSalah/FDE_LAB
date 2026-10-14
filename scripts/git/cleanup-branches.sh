@@ -163,6 +163,7 @@ TEMP_PATTERNS=(
   'align-tmp-*'
   'push-tmp-*'
   'mod-tmp-*'
+  'merge-tmp-*'
   'test-sync'
   'merge-test'
   'test-*'
