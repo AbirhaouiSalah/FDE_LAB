@@ -57,4 +57,5 @@ venv/
 .align-worktrees/
 .push-worktrees/
 .modify-worktrees/
-EOF
+EOF.backups/
+scripts.zip
