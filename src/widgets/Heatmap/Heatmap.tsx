@@ -1,49 +1,108 @@
-import type { HeatCell } from '../../mock/data';
+// src/widgets/Heatmap/Heatmap.tsx
+// Carte de chaleur (read-only). Cellules = agrégats ; RGPD : masque si < k.
+import { SmallGroupGuard } from "../SmallGroupGuard";
+import styles from "./Heatmap.module.css";
 
-function colorFor(v: number, min: number, max: number) {
-  const t = (v - min) / (max - min || 1);
-  // Interpole entre ok (vert) et alert (rouge)
-  const r = Math.round(16 + t * (239 - 16));
-  const g = Math.round(185 + t * (68 - 185));
-  const b = Math.round(129 + t * (68 - 129));
-  return `rgb(${r},${g},${b})`;
+export interface HeatmapCell {
+  row: string;
+  col: string;
+  /** Valeur numérique. `null` => cellule non disponible. */
+  value: number | null;
+  /** Effectif de l'agrégat — si < k, la cellule est masquée. */
+  sampleSize?: number | null;
 }
 
-export function Heatmap({ cells }: { cells: HeatCell[] }) {
-  const dims = Array.from(new Set(cells.map(c => c.dimension)));
-  const groups = Array.from(new Set(cells.map(c => c.group)));
-  const values = cells.map(c => c.value);
-  const min = Math.min(...values), max = Math.max(...values);
+export interface HeatmapProps {
+  label: string;
+  rows: readonly string[];
+  cols: readonly string[];
+  cells: readonly HeatmapCell[];
+  k?: number;
+  /** Format affiché pour la valeur (défaut : toFixed(1)). */
+  formatValue?: (v: number) => string;
+}
 
-  return (
-    <table className="heat" aria-label="Heatmap par dimension" data-testid="heatmap">
-      <thead>
-        <tr>
-          <th style={{ textAlign: 'left' }}>Dimension</th>
-          {groups.map(g => <th key={g}>{g}</th>)}
-        </tr>
-      </thead>
-      <tbody>
-        {dims.map(d => (
-          <tr key={d}>
-            <th style={{ textAlign: 'left', paddingRight: 12 }}>{d}</th>
-            {groups.map(g => {
-              const cell = cells.find(c => c.dimension === d && c.group === g);
-              if (!cell) return <td key={g}><div className="heat__cell" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-subtle)' }}>—</div></td>;
-              if (cell.n < 5) return (
-                <td key={g}>
-                  <div className="heat__cell" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-subtle)' }} title="Agrégat masqué (n<5)">n&lt;5</div>
-                </td>
-              );
-              return (
-                <td key={g}>
-                  <div className="heat__cell" style={{ background: colorFor(cell.value, min, max) }} title={`n=${cell.n}`}>{cell.value.toFixed(1)}</div>
-                </td>
-              );
-            })}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+function pickColor(value: number | null, min: number, max: number): string {
+  if (value === null) return "var(--c-border, #e3e6eb)";
+  const t = max > min ? (value - min) / (max - min) : 0.5;
+  // Échelle simple : accent du plus clair au plus saturé
+  const alpha = 0.15 + 0.85 * Math.max(0, Math.min(1, t));
+  return `color-mix(in oklab, var(--c-accent, #2f6feb) ${(alpha * 100).toFixed(0)}%, #fff)`;
+}
+
+export function Heatmap({
+  label, rows, cols, cells, k = 5, formatValue,
+}: HeatmapProps) {
+  const byKey = new Map<string, HeatmapCell>();
+  for (const c of cells) byKey.set(`${c.row}|${c.col}`, c);
+
+  const values = cells
+    .map((c) => c.value)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const min = values.length ? Math.min(...values) : 0;
+  const max = values.length ? Math.max(...values) : 1;
+  const fmt = formatValue ?? ((v: number) => v.toFixed(1));
+
+  const hasSmall = cells.some(
+    (c) => typeof c.sampleSize === "number" && c.sampleSize < k,
   );
+
+  const body = (
+    <section className={styles.wrap} data-widget="heatmap" aria-label={label}>
+      <h4 className={styles.title}>{label}</h4>
+      <table className={styles.grid}>
+        <thead>
+          <tr>
+            <th aria-hidden />
+            {cols.map((c) => (
+              <th key={c} scope="col" className={styles.colHead}>{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r}>
+              <th scope="row" className={styles.rowHead}>{r}</th>
+              {cols.map((c) => {
+                const cell = byKey.get(`${r}|${c}`);
+                const masked =
+                  !cell ||
+                  (typeof cell.sampleSize === "number" && cell.sampleSize < k);
+                const v = cell?.value ?? null;
+                if (masked) {
+                  return (
+                    <td
+                      key={c}
+                      className={styles.cell}
+                      data-masked="true"
+                      aria-label="Donnée masquée"
+                    >
+                      —
+                    </td>
+                  );
+                }
+                return (
+                  <td
+                    key={c}
+                    className={styles.cell}
+                    style={{ background: pickColor(v, min, max) }}
+                    title={v === null ? "n/a" : fmt(v)}
+                  >
+                    {v === null ? "—" : fmt(v)}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {hasSmall && (
+        <p className={styles.note}>
+          Certaines cellules sont masquées (effectif &lt; {k}).
+        </p>
+      )}
+    </section>
+  );
+
+  return body;
 }
