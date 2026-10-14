@@ -129,7 +129,7 @@ sep
 log "2/8  LINT (ESLint)"
 sep
 T=$(date +%s)
-if $PM_RUN --if-present lint > /tmp/validate-lint.log 2>&1; then
+if $PM_RUN lint > /tmp/validate-lint.log 2>&1; then
   ok "Lint passé"
   record "Lint" "✅" "$(($(date +%s)-T))"
 else
@@ -144,7 +144,7 @@ sep
 log "3/8  TYPECHECK (tsc --noEmit)"
 sep
 T=$(date +%s)
-if $PM_RUN --if-present typecheck > /tmp/validate-tsc.log 2>&1; then
+if $PM_RUN typecheck > /tmp/validate-tsc.log 2>&1; then
   ok "Typecheck passé"
   record "Typecheck" "✅" "$(($(date +%s)-T))"
 else
@@ -159,7 +159,7 @@ sep
 log "4/8  TESTS UNITAIRES + COVERAGE"
 sep
 T=$(date +%s)
-if $PM_RUN --if-present test -- --run --coverage > /tmp/validate-test.log 2>&1; then
+if $PM_EXEC vitest run --coverage > /tmp/validate-test.log 2>&1; then
   ok "Tests passés"
   grep -E "Test Files|Tests " /tmp/validate-test.log | head_n 5 | sed 's/^/    /' || true
   record "Tests" "✅" "$(($(date +%s)-T))"
@@ -240,7 +240,7 @@ if [ "$QUICK" -eq 0 ]; then
   log "8/8  BUILD"
   sep
   T=$(date +%s)
-  if $PM_RUN --if-present build > /tmp/validate-build.log 2>&1; then
+  if $PM_RUN build > /tmp/validate-build.log 2>&1; then
     ok "Build réussi"
     [ -d dist ] && echo "    dist/ : $(du -sh dist | awk '{print $1}')"
     record "Build" "✅" "$(($(date +%s)-T))"
