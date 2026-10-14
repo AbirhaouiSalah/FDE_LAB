@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { QueuePage } from './Queue';
+import { Queue } from './Queue';
 
-describe('QueuePage', () => {
+describe('Queue', () => {
   it('renders', () => {
-    render(<QueuePage />);
-    expect(screen.getByTestId('queue-page')).toBeInTheDocument();
+    render(<Queue />);
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 });
