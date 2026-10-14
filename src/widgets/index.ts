@@ -9,3 +9,11 @@ export type { QueueTableProps, QueueRow } from "./QueueTable";
 
 export { AlertPanel } from "./AlertPanel";
 export type { AlertPanelProps, AlertLevel } from "./AlertPanel";
+
+export { TimeSeries } from "./TimeSeries";
+
+export { FunnelChart } from "./FunnelChart";
+
+export { Gauge } from "./Gauge";
+
+export { Heatmap } from "./Heatmap";
