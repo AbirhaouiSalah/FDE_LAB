@@ -1,34 +1,45 @@
-import React from 'react';
+// src/widgets/SmallGroupGuard/SmallGroupGuard.tsx
+// Garde RGPD : masque tout agrégat dont l'effectif n < k. Fail-closed.
+import { type ReactNode } from "react";
+import styles from "./SmallGroupGuard.module.css";
 
 export interface SmallGroupGuardProps {
-  n: number;
-  threshold?: number;
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
-  context?: string;
+  /** Effectif de l'agrégat. `null`/`undefined`/non-entier => masqué. */
+  n: number | null | undefined;
+  /** Seuil de masquage. Défaut 5 (recommandation CNIL). */
+  k?: number;
+  children: ReactNode;
+  /** Rendu alternatif si masqué. */
+  maskedMessage?: ReactNode;
+  /** Libellé de traçabilité (audit). */
+  label?: string;
 }
 
-export function SmallGroupGuard(props: SmallGroupGuardProps) {
-  const { n, threshold = 5, children, fallback, context } = props;
-  if (n >= threshold) return <>{children}</>;
+export function SmallGroupGuard({
+  n, k = 5, children, maskedMessage, label,
+}: SmallGroupGuardProps) {
+  const safe =
+    typeof n === "number" &&
+    Number.isFinite(n) &&
+    Number.isInteger(n) &&
+    n >= k;
 
-  const label = context
-    ? `Agrégat masqué : groupe inférieur à ${threshold} (${context})`
-    : `Agrégat masqué : groupe inférieur à ${threshold}`;
+  if (safe) return <>{children}</>;
 
+  // Pas d'affichage du chiffre exact quand masqué : on reste fail-closed.
   return (
-    <span
-      data-testid="small-group-guard-fallback"
-      role="note"
-      aria-label={label}
-      className="small-group"
+    <div
+      className={styles.masked}
+      role="status"
+      aria-label={label ? `Agrégat masqué : ${label}` : "Agrégat masqué"}
+      data-guard="small-group"
+      data-k={k}
     >
-      {fallback ?? (
-        <>
-          <span aria-hidden="true">n&lt;{threshold}</span>
-          <span className="sr-only">{label}</span>
-        </>
+      {maskedMessage ?? (
+        <span>
+          Effectif insuffisant pour publication (seuil&nbsp;: {k}).
+        </span>
       )}
-    </span>
+    </div>
   );
 }

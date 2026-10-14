@@ -1,0 +1,22 @@
+/* src/widgets/QueueTable/QueueTable.module.css */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm, 13px);
+  background: var(--c-surface, #fff);
+}
+.table th, .table td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--c-border, #e3e6eb);
+}
+.table th { font-weight: 600; color: var(--c-text-muted, #5b6472); }
+.clickable { cursor: pointer; }
+.clickable:hover { background: color-mix(in oklab, var(--c-accent, #2f6feb) 6%, transparent); }
+.empty {
+  padding: 16px;
+  color: var(--c-text-muted, #5b6472);
+  font-size: var(--fs-sm, 13px);
+  text-align: center;
+}
+.caption { caption-side: top; text-align: left; padding: 4px 0; font-size: var(--fs-sm, 13px); color: var(--c-text-muted, #5b6472); }
