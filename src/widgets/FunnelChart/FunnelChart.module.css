@@ -1,0 +1,36 @@
+/* src/widgets/FunnelChart/FunnelChart.module.css */
+.wrap {
+  padding: 12px;
+  background: var(--c-surface, #fff);
+  border: 1px solid var(--c-border, #e3e6eb);
+  border-radius: var(--radius-md, 8px);
+}
+.title { margin: 0 0 8px; font-size: var(--fs-md, 14px); }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.item {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm, 13px);
+}
+.stageLabel { color: var(--c-text-muted, #5b6472); }
+.barWrap {
+  background: var(--c-border, #e3e6eb);
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.bar {
+  display: block;
+  height: 100%;
+  background: var(--c-accent, #2f6feb);
+}
+.value { font-variant-numeric: tabular-nums; }
+.rate { color: var(--c-text-muted, #5b6472); }
+.empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--c-text-muted, #5b6472);
+  font-size: var(--fs-sm, 13px);
+}
