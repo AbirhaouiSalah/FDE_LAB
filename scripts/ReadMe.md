@@ -69,3 +69,6 @@ Aucun `git push`/`merge` ici.
 alias run='./scripts/build/run.sh'
 alias qcheck='./scripts/quality/check.sh'
 alias gpush='./scripts/git/propagate.sh'
+
+
+REFACTORED INTO SUBFOLDER WITH THEMENGIT BUIL QUALITY 
