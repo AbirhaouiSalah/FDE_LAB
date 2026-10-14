@@ -1,26 +1,39 @@
-import type { Alert } from '../../mock/data';
+// src/widgets/AlertPanel/AlertPanel.tsx
+// Panneau d'information. Ne prend AUCUNE décision : l'humain agit.
+import { type ReactNode } from "react";
+import styles from "./AlertPanel.module.css";
 
-const ICONS: Record<Alert['level'], string> = { info: 'ℹ', warn: '⚠', error: '✕' };
+export type AlertLevel = "info" | "warning" | "critical";
 
-export function AlertPanel({ alerts }: { alerts: Alert[] }) {
-  if (!alerts.length) {
-    return (
-      <div className="empty" style={{ minHeight: 120 }} data-testid="alert-panel">
-        Aucune alerte
-      </div>
-    );
-  }
+export interface AlertPanelProps {
+  level?: AlertLevel;
+  title: string;
+  children: ReactNode;
+  /** Actions proposées à l'humain (boutons, liens). */
+  actions?: ReactNode;
+  /** Id technique pour la traçabilité. */
+  id?: string;
+}
+
+export function AlertPanel({
+  level = "info", title, children, actions, id,
+}: AlertPanelProps) {
+  const role = level === "critical" ? "alert" : "status";
   return (
-    <div role="region" aria-label="Alertes" data-testid="alert-panel">
-      {alerts.map(a => (
-        <div key={a.id} className={`alert alert--${a.level}`} role={a.level === 'error' ? 'alert' : 'status'}>
-          <span className="alert__icon" aria-hidden="true" style={{ fontSize: 16, lineHeight: '18px', textAlign: 'center' }}>{ICONS[a.level]}</span>
-          <div className="alert__body">
-            <p className="alert__title">{a.title}</p>
-            <p className="alert__desc">{a.description}</p>
-          </div>
-        </div>
-      ))}
-    </div>
+    <section
+      className={styles.panel}
+      data-level={level}
+      data-widget="alert-panel"
+      data-alert-id={id}
+      role={role}
+      aria-live={level === "critical" ? "assertive" : "polite"}
+    >
+      <header className={styles.header}>
+        <span className={styles.icon} aria-hidden>●</span>
+        <h3 className={styles.title}>{title}</h3>
+      </header>
+      <div className={styles.body}>{children}</div>
+      {actions && <footer className={styles.actions}>{actions}</footer>}
+    </section>
   );
 }
