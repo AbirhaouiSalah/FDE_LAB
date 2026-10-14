@@ -4,7 +4,7 @@ import { TimeSeries } from './TimeSeries';
 
 describe('TimeSeries', () => {
   it('renders', () => {
-    render(<TimeSeries />);
+    render(<TimeSeries data={[]} />);
     expect(screen.getByTestId('time-series')).toBeInTheDocument();
   });
 });

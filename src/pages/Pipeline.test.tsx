@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { PipelinePage } from './Pipeline';
+import { Pipeline } from './Pipeline';
 
-describe('PipelinePage', () => {
+describe('Pipeline', () => {
   it('renders', () => {
-    render(<PipelinePage />);
+    render(<Pipeline />);
     expect(screen.getByTestId('pipeline-page')).toBeInTheDocument();
   });
 });

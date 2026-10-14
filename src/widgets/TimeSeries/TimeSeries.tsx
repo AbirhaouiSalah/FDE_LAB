@@ -1,4 +1,3 @@
-import React from 'react';
 
 export interface TimeSeriesPoint { day: string; fr: number; pt: number; }
 export interface TimeSeriesProps {

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Heatmap } from '../widgets/Heatmap';
 import { SmallGroupGuard } from '../widgets/SmallGroupGuard';
 import { HEATMAP } from '../mock/data';

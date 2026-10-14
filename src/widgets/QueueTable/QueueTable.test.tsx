@@ -4,7 +4,7 @@ import { QueueTable } from './QueueTable';
 
 describe('QueueTable', () => {
   it('renders', () => {
-    render(<QueueTable />);
+    render(<QueueTable rows={[]} />);
     expect(screen.getByTestId('queue-table')).toBeInTheDocument();
   });
 });

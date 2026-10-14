@@ -4,7 +4,7 @@ import { AlertPanel } from './AlertPanel';
 
 describe('AlertPanel', () => {
   it('renders', () => {
-    render(<AlertPanel />);
+    render(<AlertPanel alerts={[]} />);
     expect(screen.getByTestId('alert-panel')).toBeInTheDocument();
   });
 });

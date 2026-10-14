@@ -59,18 +59,20 @@ export function AppShell() {
     window.location.hash = `#/${p}`;
     setPage(p);
   };
-
-  // Si le rôle change et que la page courante devient interdite → rediriger
-  useEffect(() => {
-    if (!canAccess(role, page)) navigate('overview');
-  }, [role]);
+    const handleRoleChange = (newRole: Role) => {
+    setRole(newRole);
+    if (!canAccess(newRole, page)) {
+      window.location.hash = '#/overview';
+      setPage('overview');
+    }
+  };
 
   const Current = PAGES[page];
 
   return (
     <div className="shell">
       <Header
-        role={role} onRoleChange={setRole}
+        role={role} onRoleChange={handleRoleChange}
         lang={lang} onLangChange={setLang}
         theme={theme} onThemeToggle={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
         alertCount={ALERTS.length}

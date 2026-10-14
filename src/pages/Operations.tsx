@@ -1,4 +1,3 @@
-import React from 'react';
 import { AlertPanel } from '../widgets/AlertPanel';
 import { Gauge } from '../widgets/Gauge';
 import { ALERTS, GAUGES } from '../mock/data';

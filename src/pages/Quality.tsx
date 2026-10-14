@@ -1,4 +1,3 @@
-import React from 'react';
 import { Gauge } from '../widgets/Gauge';
 import { TimeSeries } from '../widgets/TimeSeries';
 import { Heatmap } from '../widgets/Heatmap';

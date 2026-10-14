@@ -1,4 +1,3 @@
-import React from 'react';
 import { QueueTable } from '../widgets/QueueTable';
 import { QUEUE } from '../mock/data';
 

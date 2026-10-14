@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { QualityPage } from './Quality';
+import { Quality } from './Quality';
 
-describe('QualityPage', () => {
+describe('Quality', () => {
   it('renders', () => {
-    render(<QualityPage />);
+    render(<Quality />);
     expect(screen.getByTestId('quality-page')).toBeInTheDocument();
   });
 });

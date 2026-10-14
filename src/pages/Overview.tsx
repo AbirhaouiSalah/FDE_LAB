@@ -1,4 +1,3 @@
-import React from 'react';
 import { KpiCard } from '../widgets/KpiCard';
 import { AlertPanel } from '../widgets/AlertPanel';
 import { FunnelChart } from '../widgets/FunnelChart';

@@ -1,4 +1,3 @@
-import React from 'react';
 import type { HeatCell } from '../../mock/data';
 
 function colorFor(v: number, min: number, max: number) {

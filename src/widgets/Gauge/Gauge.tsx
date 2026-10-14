@@ -1,4 +1,3 @@
-import React from 'react';
 
 export function Gauge({ value, label, size = 140 }: { value: number; label: string; size?: number }) {
   const clamped = Math.max(0, Math.min(100, value));

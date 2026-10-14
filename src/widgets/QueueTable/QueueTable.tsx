@@ -1,4 +1,3 @@
-import React from 'react';
 import type { QueueRow } from '../../mock/data';
 
 const STATUS_LABEL: Record<QueueRow['status'], { label: string; cls: string }> = {

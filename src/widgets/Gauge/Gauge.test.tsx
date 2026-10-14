@@ -4,7 +4,7 @@ import { Gauge } from './Gauge';
 
 describe('Gauge', () => {
   it('renders', () => {
-    render(<Gauge />);
+    render(<Gauge value={0} label="test" />);
     expect(screen.getByTestId('gauge')).toBeInTheDocument();
   });
 });

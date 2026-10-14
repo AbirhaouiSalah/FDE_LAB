@@ -4,7 +4,7 @@ import { FunnelChart } from './FunnelChart';
 
 describe('FunnelChart', () => {
   it('renders', () => {
-    render(<FunnelChart />);
+    render(<FunnelChart stages={[]} />);
     expect(screen.getByTestId('funnel-chart')).toBeInTheDocument();
   });
 });

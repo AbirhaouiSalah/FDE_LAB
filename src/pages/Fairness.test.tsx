@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { FairnessPage } from './Fairness';
+import { Fairness } from './Fairness';
 
-describe('FairnessPage', () => {
+describe('Fairness', () => {
   it('renders', () => {
-    render(<FairnessPage />);
+    render(<Fairness />);
     expect(screen.getByTestId('fairness-page')).toBeInTheDocument();
   });
 });

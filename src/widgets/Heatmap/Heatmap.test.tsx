@@ -4,7 +4,7 @@ import { Heatmap } from './Heatmap';
 
 describe('Heatmap', () => {
   it('renders', () => {
-    render(<Heatmap />);
+    render(<Heatmap cells={[]} />);
     expect(screen.getByTestId('heatmap')).toBeInTheDocument();
   });
 });

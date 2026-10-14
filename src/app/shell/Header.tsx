@@ -1,4 +1,3 @@
-import React from 'react';
 import { IconBell, IconMoon, IconSun } from './icons';
 import type { Role } from '../../auth/rbac';
 

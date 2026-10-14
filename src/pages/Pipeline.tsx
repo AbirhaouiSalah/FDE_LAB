@@ -1,4 +1,3 @@
-import React from 'react';
 import { FunnelChart } from '../widgets/FunnelChart';
 import { TimeSeries } from '../widgets/TimeSeries';
 import { FUNNEL, TIMESERIES } from '../mock/data';

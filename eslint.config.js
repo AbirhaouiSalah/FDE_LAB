@@ -5,17 +5,19 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   {
-  ignores: [
-    'dist/**',
-    'coverage/**',
-    'node_modules/**',
-    '.ci-reports/**',
-    '.sync-worktrees/**',
-    '.align-worktrees/**',
-    'public/**',
-    'workflows/**',       // ← doublons, à retirer plus tard si besoin
-    '**/*.d.ts',
-  ],
+    ignores: [
+      'venv/**',              // ← AJOUT
+      '.pytest_cache/**',     // ← AJOUT
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+      '.ci-reports/**',
+      '.sync-worktrees/**',
+      '.align-worktrees/**',
+      'public/**',
+      'workflows/**',
+      '**/*.d.ts',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -33,9 +35,11 @@ export default tseslint.config(
     settings: { react: { version: 'detect' } },
     rules: {
       ...react.configs.recommended.rules,
-      ...reactHooks.configs.recommended.rules,
+      ...reactHooks.configs.flat.recommended.rules,  // ← flat.recommended (v7.x)
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
+       'react/no-unescaped-entities': 'off',
+      'react-hooks/set-state-in-effect': 'off',          // ← AJOUT (ou corrige manuellement)
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
@@ -55,6 +59,10 @@ export default tseslint.config(
   },
   {
     files: ['**/*.test.{ts,tsx}', '**/*.a11y.test.{ts,tsx}', 'vitest.setup.ts'],
+    rules: { 'no-console': 'off' },
+  },
+  {
+    files: ['scripts/**/*.{ts,js}'],       // ← AJOUT : autorise console.log dans scripts/
     rules: { 'no-console': 'off' },
   },
 );

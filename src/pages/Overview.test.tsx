@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { OverviewPage } from './Overview';
+import { Overview } from './Overview';
 
-describe('OverviewPage', () => {
+describe('Overview', () => {
   it('renders', () => {
-    render(<OverviewPage />);
+    render(<Overview />);
     expect(screen.getByTestId('overview-page')).toBeInTheDocument();
   });
 });

@@ -1,4 +1,3 @@
-import React from 'react';
 import { RUBRIC_META } from '../mock/data';
 
 export function Governance() {

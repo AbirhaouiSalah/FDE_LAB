@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Alert } from '../../mock/data';
 
 const ICONS: Record<Alert['level'], string> = { info: 'ℹ', warn: '⚠', error: '✕' };
