@@ -48,7 +48,7 @@ for (const key of allKeys) {
 }
 
 if (!hasError) {
-  console.log(`✅ i18n parity OK (${allKeys.size} clés, ${LOCALES.length} locales)`);
+  console.warn(`✅ i18n parity OK (${allKeys.size} clés, ${LOCALES.length} locales)`);
   process.exit(0);
 }
 
