@@ -71,7 +71,7 @@ export function KpiCard(props: KpiCardProps) {
       >
         <p className="kpi__label">{label}</p>
         <p style={{ margin: '8px 0 0' }}>
-          <span className="small-group">
+          <span className="small-group" data-testid="small-group-guard-fallback">
             <span aria-hidden="true">n&lt;5</span>
             <span className="sr-only">Agrégat masqué : groupe inférieur à 5</span>
           </span>
