@@ -1,28 +1,58 @@
-export interface FunnelStage { label: string; value: number; }
+// src/widgets/FunnelChart/FunnelChart.tsx
+// Entonnoir de conversion (read-only). Chaque étape = un agrégat.
+import { SmallGroupGuard } from "../SmallGroupGuard";
+import styles from "./FunnelChart.module.css";
 
-export function FunnelChart({ stages }: { stages: FunnelStage[] }) {
-  if (!stages.length) {
-    return <div className="empty" data-testid="funnel-chart">Aucune étape</div>;
+export interface FunnelStage {
+  /** Libellé déjà traduit. */
+  label: string;
+  /** Effectif de l'étape. */
+  count: number;
+}
+
+export interface FunnelChartProps {
+  label: string;
+  stages: readonly FunnelStage[];
+  minSampleSize?: number | null;
+  k?: number;
+}
+
+export function FunnelChart({
+  label, stages, minSampleSize, k = 5,
+}: FunnelChartProps) {
+  if (stages.length === 0) {
+    return <div className={styles.empty} role="status">Aucune donnée</div>;
   }
-  const max = stages[0].value;
+  const max = Math.max(...stages.map((s) => s.count), 1);
+
+  const body = (
+    <section className={styles.wrap} data-widget="funnel-chart" aria-label={label}>
+      <h4 className={styles.title}>{label}</h4>
+      <ol className={styles.list}>
+        {stages.map((s) => {
+          const pct = (s.count / max) * 100;
+          const total = stages[0].count || 1;
+          const rate = (s.count / total) * 100;
+          return (
+            <li key={s.label} className={styles.item}>
+              <span className={styles.stageLabel}>{s.label}</span>
+              <span className={styles.barWrap}>
+                <span className={styles.bar} style={{ width: `${pct}%` }} />
+              </span>
+              <span className={styles.value}>
+                {s.count} <span className={styles.rate}>({rate.toFixed(0)}%)</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+
+  if (minSampleSize === undefined || minSampleSize === null) return body;
   return (
-    <div className="funnel" data-testid="funnel-chart">
-      {stages.map((s, i) => {
-        const pct = (s.value / max) * 100;
-        const prev = i === 0 ? s.value : stages[i - 1].value;
-        const conv = i === 0 ? 100 : (s.value / prev) * 100;
-        return (
-          <div className="funnel__stage" key={s.label}>
-            <span className="funnel__label">{s.label}</span>
-            <div className="funnel__bar-wrap">
-              <div className="funnel__bar" style={{ width: `${pct}%` }}>
-                {s.value.toLocaleString('fr-FR')}
-              </div>
-            </div>
-            <span className="funnel__conversion">{i === 0 ? '—' : `${conv.toFixed(0)} %`}</span>
-          </div>
-        );
-      })}
-    </div>
+    <SmallGroupGuard n={minSampleSize} k={k} label={label}>
+      {body}
+    </SmallGroupGuard>
   );
 }

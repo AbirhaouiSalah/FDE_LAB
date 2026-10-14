@@ -1,47 +1,27 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { AlertPanel } from './AlertPanel';
-import type { Alert } from '../../mock/data';
+// src/widgets/AlertPanel/AlertPanel.test.tsx
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { AlertPanel } from "./AlertPanel";
 
-describe('AlertPanel', () => {
-  it('renders empty state when no alerts', () => {
-    render(<AlertPanel alerts={[]} />);
-    expect(screen.getByTestId('alert-panel')).toHaveTextContent(/aucune alerte/i);
+describe("AlertPanel", () => {
+  it("affiche le titre et le contenu", () => {
+    render(<AlertPanel title="Info"><p>Détail</p></AlertPanel>);
+    expect(screen.getByText("Info")).toBeInTheDocument();
+    expect(screen.getByText("Détail")).toBeInTheDocument();
   });
 
-  it('renders all alerts with title and description', () => {
-    const alerts: Alert[] = [
-      { id: '1', level: 'warn', title: 'Alerte A', description: 'Description A' },
-      { id: '2', level: 'info', title: 'Alerte B', description: 'Description B' },
-    ];
-    render(<AlertPanel alerts={alerts} />);
-    expect(screen.getByText('Alerte A')).toBeInTheDocument();
-    expect(screen.getByText('Alerte B')).toBeInTheDocument();
-    expect(screen.getByText('Description A')).toBeInTheDocument();
-    expect(screen.getByText('Description B')).toBeInTheDocument();
+  it("utilise role=alert pour critical", () => {
+    render(<AlertPanel level="critical" title="Alerte">x</AlertPanel>);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 
-  it('assigns role=alert to error-level alerts', () => {
-    const alerts: Alert[] = [
-      { id: '1', level: 'error', title: 'Erreur', description: 'Détail' },
-    ];
-    render(<AlertPanel alerts={alerts} />);
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+  it("utilise role=status pour info/warning", () => {
+    render(<AlertPanel level="warning" title="Attention">x</AlertPanel>);
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
-  it('assigns role=status to non-error alerts', () => {
-    const alerts: Alert[] = [
-      { id: '1', level: 'warn', title: 'Warn', description: 'Détail' },
-    ];
-    render(<AlertPanel alerts={alerts} />);
-    expect(screen.getByRole('status')).toBeInTheDocument();
-  });
-
-  it('exposes region with aria-label', () => {
-    const alerts: Alert[] = [
-      { id: '1', level: 'info', title: 'Info', description: 'Détail' },
-    ];
-    render(<AlertPanel alerts={alerts} />);
-    expect(screen.getByRole('region', { name: /alertes/i })).toBeInTheDocument();
+  it("expose le level en data-attr", () => {
+    const { container } = render(<AlertPanel level="warning" title="x">y</AlertPanel>);
+    expect(container.querySelector("[data-level='warning']")).toBeInTheDocument();
   });
 });
