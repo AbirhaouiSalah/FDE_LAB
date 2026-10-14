@@ -1,1 +1,2 @@
-export * from './QueueTable';
+export { QueueTable } from "./QueueTable";
+export type { QueueTableProps, QueueRow } from "./QueueTable";
