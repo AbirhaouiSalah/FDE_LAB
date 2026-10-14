@@ -1,0 +1,24 @@
+/* src/widgets/Heatmap/Heatmap.module.css */
+.wrap {
+  padding: 12px;
+  background: var(--c-surface, #fff);
+  border: 1px solid var(--c-border, #e3e6eb);
+  border-radius: var(--radius-md, 8px);
+}
+.title { margin: 0 0 8px; font-size: var(--fs-md, 14px); }
+.grid { border-collapse: separate; border-spacing: 2px; font-size: var(--fs-sm, 13px); }
+.colHead, .rowHead { font-weight: 600; color: var(--c-text-muted, #5b6472); padding: 4px 6px; }
+.cell {
+  width: 44px;
+  height: 28px;
+  text-align: center;
+  vertical-align: middle;
+  border-radius: 3px;
+  color: var(--c-text, #1c2024);
+  font-variant-numeric: tabular-nums;
+}
+.cell[data-masked="true"] {
+  background: var(--c-bg, #f7f8fa);
+  color: var(--c-text-muted, #5b6472);
+}
+.note { margin: 8px 0 0; font-size: var(--fs-sm, 13px); color: var(--c-text-muted, #5b6472); }
