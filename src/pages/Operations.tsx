@@ -1,6 +1,6 @@
 import { AlertPanel } from "../widgets/AlertPanel";
 import { Gauge } from "../widgets/Gauge";
-import { ALERTS, GAUGES } from "../mock/data";
+import { ALERTS, GAUGES, toAlertLevel } from "../mock/data";
 
 export function Operations() {
   return (
@@ -17,7 +17,11 @@ export function Operations() {
           <h2 className="card__title">Alertes actives</h2>
           <div style={{ display: "grid", gap: 12 }}>
             {ALERTS.map((a) => (
-              <AlertPanel key={a.id} level={a.level} title={a.title}>
+              <AlertPanel
+                key={a.id}
+                level={toAlertLevel(a.level)}
+                title={a.title}
+              >
                 {a.description}
               </AlertPanel>
             ))}
@@ -25,9 +29,7 @@ export function Operations() {
         </div>
         <div className="card">
           <h2 className="card__title">Santé</h2>
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: 16 }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {GAUGES.slice(0, 2).map((g) => (
               <Gauge key={g.label} value={g.value} label={g.label} />
             ))}

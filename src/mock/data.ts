@@ -172,3 +172,48 @@ export const RUBRIC_META = {
   site: 'FR + PT',
   note: 'Rubric de pré-screening FDE. Read-only pour les recruteurs.',
 };
+
+// ─── Mappers : mock data → props widgets L3 ─────────────────────────────
+
+export function toTimeSeriesPoints(
+  pts: TimeseriesPoint[],
+): { t: string; v: number }[] {
+  return pts.map((p) => ({ t: p.day, v: p.fr }));
+}
+
+export function toFunnelStages(
+  stages: FunnelStage[],
+): { label: string; count: number }[] {
+  return stages.map((s) => ({ label: s.label, count: s.value }));
+}
+
+export function toHeatmapCells(
+  cells: HeatCell[],
+): { row: string; col: string; value: number | null; sampleSize?: number | null }[] {
+  return cells.map((c) => ({
+    row: c.dimension,
+    col: c.group,
+    value: c.value,
+    sampleSize: c.n,
+  }));
+}
+
+export function toAlertLevel(
+  level: string,
+): "info" | "warning" | "critical" {
+  if (level === "warn") return "warning";
+  if (level === "error") return "critical";
+  return "info";
+}
+
+export function toQueueRows(
+  rows: QueueRow[],
+): { id: string; label: string; status: string; priority?: number; updatedAt?: string }[] {
+  return rows.map((r) => ({
+    id: r.id,
+    label: r.id,
+    status: r.status,
+    priority: undefined,
+    updatedAt: undefined,
+  }));
+}

@@ -2,7 +2,10 @@ import { KpiCard } from "../widgets/KpiCard";
 import { AlertPanel } from "../widgets/AlertPanel";
 import { FunnelChart } from "../widgets/FunnelChart";
 import { TimeSeries } from "../widgets/TimeSeries";
-import { KPIS, ALERTS, FUNNEL, TIMESERIES, RUBRIC_META } from "../mock/data";
+import {
+  KPIS, ALERTS, FUNNEL, TIMESERIES, RUBRIC_META,
+  toFunnelStages, toTimeSeriesPoints, toAlertLevel,
+} from "../mock/data";
 
 export function Overview() {
   return (
@@ -37,13 +40,22 @@ export function Overview() {
       <div className="grid-2">
         <div className="card">
           <h2 className="card__title">Entonnoir de pré-screening</h2>
-          <FunnelChart stages={FUNNEL} />
+          <FunnelChart
+            label="Entonnoir de pré-screening"
+            stages={toFunnelStages(FUNNEL)}
+            minSampleSize={100}
+            k={5}
+          />
         </div>
         <div className="card">
           <h2 className="card__title">Alertes ({ALERTS.length})</h2>
           <div style={{ display: "grid", gap: 12 }}>
             {ALERTS.map((a) => (
-              <AlertPanel key={a.id} level={a.level} title={a.title}>
+              <AlertPanel
+                key={a.id}
+                level={toAlertLevel(a.level)}
+                title={a.title}
+              >
                 {a.description}
               </AlertPanel>
             ))}
@@ -55,7 +67,13 @@ export function Overview() {
         <h2 className="card__title">
           Temps médian de pré-screening — 14 derniers jours
         </h2>
-        <TimeSeries data={TIMESERIES} yLabel="min" />
+        <TimeSeries
+          label="Temps médian de pré-screening"
+          points={toTimeSeriesPoints(TIMESERIES)}
+          unit="min"
+          minSampleSize={42}
+          k={5}
+        />
       </div>
     </div>
   );

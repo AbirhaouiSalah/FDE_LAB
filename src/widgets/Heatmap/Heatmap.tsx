@@ -1,6 +1,5 @@
 // src/widgets/Heatmap/Heatmap.tsx
 // Carte de chaleur (read-only). Cellules = agrégats ; RGPD : masque si < k.
-import { SmallGroupGuard } from "../SmallGroupGuard";
 import styles from "./Heatmap.module.css";
 
 export interface HeatmapCell {

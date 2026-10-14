@@ -1,6 +1,6 @@
-import { FunnelChart } from '../widgets/FunnelChart';
-import { TimeSeries } from '../widgets/TimeSeries';
-import { FUNNEL, TIMESERIES } from '../mock/data';
+import { FunnelChart } from "../widgets/FunnelChart";
+import { TimeSeries } from "../widgets/TimeSeries";
+import { FUNNEL, TIMESERIES, toFunnelStages, toTimeSeriesPoints } from "../mock/data";
 
 export function Pipeline() {
   return (
@@ -12,12 +12,23 @@ export function Pipeline() {
 
       <div className="card" style={{ marginBottom: 24 }}>
         <h2 className="card__title">Entonnoir — 30 derniers jours</h2>
-        <FunnelChart stages={FUNNEL} />
+        <FunnelChart
+          label="Entonnoir — 30 derniers jours"
+          stages={toFunnelStages(FUNNEL)}
+          minSampleSize={100}
+          k={5}
+        />
       </div>
 
       <div className="card">
         <h2 className="card__title">Temps médian par site — 14 jours</h2>
-        <TimeSeries data={TIMESERIES} yLabel="min" />
+        <TimeSeries
+          label="Temps médian par site"
+          points={toTimeSeriesPoints(TIMESERIES)}
+          unit="min"
+          minSampleSize={42}
+          k={5}
+        />
       </div>
     </div>
   );
