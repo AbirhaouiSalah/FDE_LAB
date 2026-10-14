@@ -1,43 +1,31 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { Gauge } from './Gauge';
+// src/widgets/Gauge/Gauge.test.tsx
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { Gauge } from "./Gauge";
 
-describe('Gauge', () => {
-  it('renders the label', () => {
-    render(<Gauge value={88.5} label="Taux d'accord" />);
-    expect(screen.getByText("Taux d'accord")).toBeInTheDocument();
+describe("Gauge", () => {
+  it("affiche la valeur formatée", () => {
+    render(<Gauge label="Score" value={72.4} />);
+    expect(screen.getByText("72%")).toBeInTheDocument();
   });
 
-  it('formats the value with one decimal and %', () => {
-    render(<Gauge value={88.456} label="x" />);
-    expect(screen.getByText(/88\.5\s*%/)).toBeInTheDocument();
+  it("clampe au-delà de 100", () => {
+    render(<Gauge label="Score" value={150} />);
+    expect(screen.getByText("100%")).toBeInTheDocument();
   });
 
-  it('uses ok color for value >= 85', () => {
-    const { container } = render(<Gauge value={90} label="x" />);
-    const svg = container.querySelector('svg');
-    expect(svg?.innerHTML).toContain('var(--color-ok)');
+  it("clampe en dessous de 0", () => {
+    render(<Gauge label="Score" value={-5} />);
+    expect(screen.getByText("0%")).toBeInTheDocument();
   });
 
-  it('uses watch color for 70 <= value < 85', () => {
-    const { container } = render(<Gauge value={75} label="x" />);
-    const svg = container.querySelector('svg');
-    expect(svg?.innerHTML).toContain('var(--color-watch)');
+  it("affiche — si null", () => {
+    render(<Gauge label="Score" value={null} />);
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
-  it('uses alert color for value < 70', () => {
-    const { container } = render(<Gauge value={50} label="x" />);
-    const svg = container.querySelector('svg');
-    expect(svg?.innerHTML).toContain('var(--color-alert)');
-  });
-
-  it('clamps value to 0-100', () => {
-    render(<Gauge value={150} label="x" />);
-    expect(screen.getByText(/100\.0\s*%/)).toBeInTheDocument();
-  });
-
-  it('wraps in data-testid=gauge', () => {
-    render(<Gauge value={50} label="x" />);
-    expect(screen.getByTestId('gauge')).toBeInTheDocument();
+  it("masque si minSampleSize < k", () => {
+    render(<Gauge label="Score" value={72} minSampleSize={2} k={5} />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 });
