@@ -49,10 +49,15 @@ describe('RBAC — invariants structurels', () => {
     }
   });
 
-  it('seul hrd voit toutes les pages', () => {
+  it("hrd voit toutes les pages sauf operations", () => {
+    const hrdPages = [...RBAC.hrd].sort();
+    const allExceptOperations = ALL_PAGES.filter(p => p !== "operations").sort();
+    expect(hrdPages).toEqual(allExceptOperations);
+  });
+
+  it("mco est le seul à voir operations", () => {
     for (const role of ALL_ROLES) {
-      const all = ALL_PAGES.every(p => canAccess(role, p));
-      expect(all).toBe(role === 'hrd');
+      expect(canAccess(role, "operations")).toBe(role === "mco");
     }
   });
 
