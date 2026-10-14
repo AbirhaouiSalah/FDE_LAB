@@ -30,7 +30,7 @@ GIT_EMAIL="sabirhaouipro@gmail.com"
 
 # ─── Options ───────────────────────────────────────────────────────────────
 DRY_RUN=1
-STRATEGY="ours"
+STRATEGY="theirs"
 FILTER_CI=1
 TARGET_BRANCH="main"
 
