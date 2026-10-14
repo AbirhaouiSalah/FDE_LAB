@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { RubricPage } from './Rubric';
+import { Rubric } from './Rubric';
 
-describe('RubricPage', () => {
+describe('Rubric', () => {
   it('renders', () => {
-    render(<RubricPage />);
-    expect(screen.getByTestId('rubric-page')).toBeInTheDocument();
+    render(<Rubric />);
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 });
